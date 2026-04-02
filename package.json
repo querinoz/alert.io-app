@@ -45,5 +45,9 @@
     "@types/react": "~18.3.0",
     "typescript": "~5.3.0"
   },
-  "private": true
+  "private": true,
+  "sdkExports": {
+    "@attention-app/sdk": "./src/sdk/index.ts",
+    "@attention-app/sdk/web": "./src/sdk/web-embed.ts"
+  }
 }
