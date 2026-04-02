@@ -8,6 +8,7 @@ import { DARK_MAP_STYLE } from './mapStyles';
 import { Colors } from '../../theme/colors';
 import { getCategoryMeta } from '../../constants/categories';
 import { WORLD_CAPITALS } from '../../data/worldCapitals';
+import { WORLD_POIS, POI_META } from '../../data/worldPOIs';
 
 function PulsingMarker({ marker, isSelected, onPress, dimmed }: {
   marker: MapMarker;
@@ -268,6 +269,24 @@ export function AttentionMap({
           </Marker>
         )}
 
+        {zoomLevel >= 10 && WORLD_POIS.map((poi) => {
+          const meta = POI_META[poi.type];
+          return (
+            <Marker
+              key={poi.id}
+              coordinate={{ latitude: poi.lat, longitude: poi.lng }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.poiMarker}>
+                <View style={[styles.poiCircle, { backgroundColor: meta.color + '18', borderColor: meta.color + '50' }]}>
+                  <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
+                </View>
+              </View>
+            </Marker>
+          );
+        })}
+
         {zoomLevel < 7 && WORLD_CAPITALS.map((cap) => (
           <Marker
             key={cap.country}
@@ -421,6 +440,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
     elevation: 6,
+  },
+  poiMarker: {
+    alignItems: 'center',
+  },
+  poiCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   capitalMarker: {
     alignItems: 'center',

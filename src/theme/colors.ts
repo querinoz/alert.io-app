@@ -65,6 +65,9 @@ export const Colors = {
     medical: '#FF3B7A',
     traffic: '#FFB800',
     noise: '#7B61FF',
+    flood: '#0EA5E9',
+    injured_animal: '#F59E0B',
+    building_risk: '#DC2626',
     other: '#8A8A9A',
   },
 
@@ -142,6 +145,9 @@ export const LightColors = {
     medical: '#D42B63',
     traffic: '#D69500',
     noise: '#5B42D6',
+    flood: '#0284C7',
+    injured_animal: '#D97706',
+    building_risk: '#B91C1C',
     other: '#6E7588',
   },
 

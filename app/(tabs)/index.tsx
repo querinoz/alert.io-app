@@ -21,7 +21,8 @@ import { Spacing, Radius } from '../../src/theme/spacing';
 import { getCategoryMeta } from '../../src/constants/categories';
 import { timeAgo, formatDistance, MOCK_FEED } from '../../src/services/mockData';
 import type { Incident, FeedItem } from '../../src/types';
-import { seedDatabase } from '../../src/services/database';
+import { seedDatabase, IncidentDB } from '../../src/services/database';
+import { generateWorldIncidents } from '../../src/data/worldIncidents';
 import FamilyScreen from './family';
 import ProfileScreen from './profile';
 import ChainScreen from './chain';
@@ -265,9 +266,14 @@ export default function MapScreen() {
   const speedAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    seedDatabase().then(() => {
-      loadIncidents().then(() => announce(`Map loaded with ${incidents.length} incidents nearby`));
+    seedDatabase().then(async () => {
+      const worldInc = generateWorldIncidents();
+      for (const inc of worldInc) {
+        try { await IncidentDB.create(inc); } catch { /* skip duplicates */ }
+      }
+      await loadIncidents();
       loadFamily();
+      announce(`Map loaded with incidents from around the world`);
     });
   }, []);
 

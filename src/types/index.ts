@@ -8,6 +8,9 @@ export type IncidentCategory =
   | 'medical'
   | 'traffic'
   | 'noise'
+  | 'flood'
+  | 'injured_animal'
+  | 'building_risk'
   | 'other';
 
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';

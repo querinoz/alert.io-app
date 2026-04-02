@@ -6,6 +6,7 @@ import { Colors } from '../../theme/colors';
 import { getCategoryMeta } from '../../constants/categories';
 import { timeAgo } from '../../services/mockData';
 import { WORLD_CAPITALS } from '../../data/worldCapitals';
+import { WORLD_POIS, POI_META } from '../../data/worldPOIs';
 
 declare const maplibregl: any;
 
@@ -30,22 +31,11 @@ const EMOJI_MAP: Record<string, string> = {
   'shield-alert': '🚨', 'car-crash': '💥', 'eye-outline': '👁', 'fire': '🔥',
   'police-badge': '🚔', 'medical-bag': '🏥', 'traffic-light': '🚦',
   'volume-high': '📢', 'alert-outline': '⚠️', 'alert-octagon': '⚠️',
-  'dots-horizontal-circle': '🔵',
+  'dots-horizontal-circle': '🔵', 'waves': '🌊', 'paw': '🐾',
+  'office-building-cog': '🏚️',
 };
 
-const POIS: { type: string; emoji: string; lat: number; lng: number }[] = [
-  { type: 'hospital', emoji: '🏥', lat: 41.2375, lng: -8.6215 },
-  { type: 'hospital', emoji: '🏥', lat: 41.2200, lng: -8.6050 },
-  { type: 'hospital', emoji: '🏥', lat: 41.2510, lng: -8.6400 },
-  { type: 'taxi', emoji: '🚕', lat: 41.2345, lng: -8.6190 },
-  { type: 'taxi', emoji: '🚕', lat: 41.2470, lng: -8.6330 },
-  { type: 'police', emoji: '🚔', lat: 41.2360, lng: -8.6250 },
-  { type: 'police', emoji: '🚔', lat: 41.2180, lng: -8.6150 },
-  { type: 'fire', emoji: '🚒', lat: 41.2520, lng: -8.6200 },
-  { type: 'fire', emoji: '🚒', lat: 41.2280, lng: -8.6380 },
-  { type: 'vet', emoji: '🐾', lat: 41.2380, lng: -8.5980 },
-  { type: 'vet', emoji: '🐾', lat: 41.2450, lng: -8.6470 },
-];
+// POIs are loaded from worldPOIs.ts
 
 function injectMapStyles() {
   if (document.getElementById('attention-maplibre-styles')) return;
@@ -219,10 +209,29 @@ function createFamilyEl(name: string, role: string, isOnline: boolean): HTMLDivE
   return el;
 }
 
-function createPOIEl(emoji: string): HTMLDivElement {
+function createPOIEl(emoji: string, name: string, color: string): HTMLDivElement {
   const el = document.createElement('div');
-  el.style.cssText = 'width:22px;height:22px;display:flex;align-items:center;justify-content:center;opacity:0.5;font-size:14px;';
-  el.textContent = emoji;
+  el.className = 'attn-marker';
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:all 0.2s ease;';
+  el.innerHTML = `
+    <div style="width:24px;height:24px;border-radius:50%;background:${color}18;border:1.5px solid ${color}50;
+      display:flex;align-items:center;justify-content:center;font-size:13px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:all 0.2s ease;">${emoji}</div>
+    <div style="margin-top:1px;font-size:7px;color:rgba(255,255,255,0.6);font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis;
+      text-align:center;opacity:0;transition:opacity 0.2s ease;">${name}</div>`;
+  el.addEventListener('mouseenter', () => {
+    const label = el.querySelector('div:last-child') as HTMLElement;
+    if (label) label.style.opacity = '1';
+    const icon = el.querySelector('div:first-child') as HTMLElement;
+    if (icon) { icon.style.transform = 'scale(1.25)'; icon.style.boxShadow = `0 0 12px ${color}60`; }
+  });
+  el.addEventListener('mouseleave', () => {
+    const label = el.querySelector('div:last-child') as HTMLElement;
+    if (label) label.style.opacity = '0';
+    const icon = el.querySelector('div:first-child') as HTMLElement;
+    if (icon) { icon.style.transform = 'scale(1)'; icon.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)'; }
+  });
   return el;
 }
 
@@ -542,13 +551,15 @@ export function AttentionMap({
     if (!map) return;
     poiMarkersRef.current.forEach(m => m.remove());
     poiMarkersRef.current = [];
-    POIS.forEach((poi) => {
-      const el = createPOIEl(poi.emoji);
+    WORLD_POIS.forEach((poi) => {
+      const meta = POI_META[poi.type];
+      const el = createPOIEl(meta.emoji, poi.name, meta.color);
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([poi.lng, poi.lat])
         .addTo(map);
       poiMarkersRef.current.push(marker);
     });
+    updatePOIVisibility();
   }
 
   useEffect(() => {
@@ -577,10 +588,21 @@ export function AttentionMap({
     const map = glMap.current;
     if (!map) return;
     const zoom = map.getZoom();
-    const show = zoom < 7;
+    const showCapitals = zoom < 7;
     capitalMarkersRef.current.forEach((m: any) => {
       const el = m.getElement();
-      if (el) el.style.display = show ? 'flex' : 'none';
+      if (el) el.style.display = showCapitals ? 'flex' : 'none';
+    });
+  }
+
+  function updatePOIVisibility() {
+    const map = glMap.current;
+    if (!map) return;
+    const zoom = map.getZoom();
+    const showPOIs = zoom >= 10;
+    poiMarkersRef.current.forEach((m: any) => {
+      const el = m.getElement();
+      if (el) el.style.display = showPOIs ? 'flex' : 'none';
     });
   }
 
@@ -590,7 +612,7 @@ export function AttentionMap({
 
     addCapitalMarkers();
 
-    const onZoom = () => updateCapitalVisibility();
+    const onZoom = () => { updateCapitalVisibility(); updatePOIVisibility(); };
     map.on('zoom', onZoom);
     return () => { map.off('zoom', onZoom); };
   }, [loaded]);
