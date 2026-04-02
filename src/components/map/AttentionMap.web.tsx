@@ -7,6 +7,7 @@ import { getCategoryMeta } from '../../constants/categories';
 import { timeAgo } from '../../services/mockData';
 import { WORLD_CAPITALS } from '../../data/worldCapitals';
 import { WORLD_POIS, POI_META } from '../../data/worldPOIs';
+import { MOCK_USER_PROFILES, type UserProfileCard } from '../../services/mockData';
 
 declare const maplibregl: any;
 
@@ -83,6 +84,45 @@ function injectMapStyles() {
     .incident-popup .stat { display:flex; align-items:center; gap:3px; }
     .capital-marker:hover { transform: scale(1.3); z-index: 50 !important; }
     .capital-marker:hover div:last-child { max-width: 120px !important; font-size: 8px !important; color: rgba(255,255,255,0.95) !important; }
+    .user-profile-card {
+      position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      width: 260px; background: rgba(16,16,28,0.97); backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 0 20px rgba(0,170,255,0.08);
+      padding: 0; opacity: 0; pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      transform: translateX(-50%) translateY(6px); z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .user-profile-card.visible {
+      opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0);
+    }
+    .user-profile-card::after {
+      content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+      width: 12px; height: 12px; background: rgba(16,16,28,0.97);
+      border-right: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .upc-header { padding: 14px 14px 10px; display: flex; gap: 10px; align-items: center; }
+    .upc-avatar {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; color: #fff;
+      box-shadow: 0 0 12px var(--badge-glow, rgba(0,170,255,0.4));
+    }
+    .upc-info { flex: 1; min-width: 0; }
+    .upc-name { color: #fff; font-size: 14px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upc-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; margin-top: 2px; padding: 1px 6px; border-radius: 6px; }
+    .upc-fame { color: rgba(255,255,255,0.45); font-size: 10px; margin-top: 2px; font-style: italic; }
+    .upc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-top: 1px solid rgba(255,255,255,0.06); }
+    .upc-stat { padding: 8px 6px; text-align: center; }
+    .upc-stat:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.06); }
+    .upc-stat-val { color: #fff; font-size: 14px; font-weight: 800; }
+    .upc-stat-label { color: rgba(255,255,255,0.4); font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+    .upc-footer { padding: 8px 14px 10px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; }
+    .upc-meta { color: rgba(255,255,255,0.35); font-size: 9px; }
+    .upc-online { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 600; }
+    .upc-online-dot { width: 6px; height: 6px; border-radius: 50%; }
   `;
   document.head.appendChild(style);
 }
@@ -152,7 +192,7 @@ function createMarkerEl(marker: MapMarker, isSelected: boolean): HTMLDivElement 
 
 function createUserEl(): HTMLDivElement {
   const el = document.createElement('div');
-  el.style.cssText = 'width:48px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;position:relative;cursor:default;';
+  el.style.cssText = 'width:48px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;position:relative;cursor:pointer;';
 
   const ring = document.createElement('div');
   ring.className = 'user-glow-ring';
@@ -160,7 +200,7 @@ function createUserEl(): HTMLDivElement {
   el.appendChild(ring);
 
   const circle = document.createElement('div');
-  circle.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 16px rgba(33,150,255,0.7),0 2px 8px rgba(0,0,0,0.4);z-index:2;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2196FF 0%,#1565C0 100%);margin-top:4px;';
+  circle.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 16px rgba(33,150,255,0.7),0 2px 8px rgba(0,0,0,0.4);z-index:2;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2196FF 0%,#1565C0 100%);margin-top:4px;transition:all 0.2s ease;';
 
   const personImg = document.createElement('img');
   personImg.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>');
@@ -173,6 +213,31 @@ function createUserEl(): HTMLDivElement {
   label.style.cssText = 'margin-top:2px;font-size:8px;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,0.9);letter-spacing:0.5px;z-index:2;';
   label.textContent = 'You';
   el.appendChild(label);
+
+  const myProfile = MOCK_USER_PROFILES['mock-user-001'];
+  if (myProfile) {
+    const card = document.createElement('div');
+    card.className = 'user-profile-card';
+    card.innerHTML = buildProfileCardHTML(myProfile);
+    el.appendChild(card);
+
+    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+    el.addEventListener('mouseenter', () => {
+      hoverTimeout = setTimeout(() => {
+        card.classList.add('visible');
+        el.style.zIndex = '9999';
+        circle.style.transform = 'scale(1.15)';
+        circle.style.boxShadow = '0 0 24px rgba(33,150,255,0.9),0 2px 8px rgba(0,0,0,0.4)';
+      }, 200);
+    });
+    el.addEventListener('mouseleave', () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+      card.classList.remove('visible');
+      el.style.zIndex = '';
+      circle.style.transform = 'scale(1)';
+      circle.style.boxShadow = '0 0 16px rgba(33,150,255,0.7),0 2px 8px rgba(0,0,0,0.4)';
+    });
+  }
 
   return el;
 }
@@ -193,19 +258,105 @@ function createSpeedCamEl(limit: number | null): HTMLDivElement {
   return el;
 }
 
-function createFamilyEl(name: string, role: string, isOnline: boolean): HTMLDivElement {
+function formatMemberSince(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  return rem > 0 ? `${years}y ${rem}mo` : `${years}y`;
+}
+
+function formatReputation(rep: number): string {
+  if (rep >= 1000000) return `${(rep / 1000000).toFixed(1)}M`;
+  if (rep >= 1000) return `${(rep / 1000).toFixed(1)}K`;
+  return `${rep}`;
+}
+
+function buildProfileCardHTML(profile: UserProfileCard): string {
+  const avatarBg = `linear-gradient(135deg, ${profile.badgeColor}40 0%, ${profile.badgeColor}15 100%)`;
+  const initial = profile.displayName.charAt(0).toUpperCase();
+  const onlineColor = profile.isOnline ? '#34C759' : '#6B7280';
+  const onlineLabel = profile.isOnline ? 'Online' : `Active ${formatMemberSince(profile.lastActive)}`;
+
+  return `
+    <div class="upc-header">
+      <div class="upc-avatar" style="background:${avatarBg};border:2px solid ${profile.badgeColor};--badge-glow:${profile.badgeColor}60;">
+        ${profile.photoURL ? `<img src="${profile.photoURL}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />` : initial}
+      </div>
+      <div class="upc-info">
+        <div class="upc-name">${profile.displayName} ${profile.isGuardian ? '🛡️' : ''}</div>
+        <div class="upc-badge" style="background:${profile.badgeColor}18;color:${profile.badgeColor};">
+          ${profile.levelIcon} Lvl ${profile.level} · ${profile.levelName}
+        </div>
+        <div class="upc-fame">"${profile.fame}"</div>
+      </div>
+    </div>
+    <div class="upc-stats">
+      <div class="upc-stat">
+        <div class="upc-stat-val" style="color:${profile.badgeColor};">${formatReputation(profile.reputation)}</div>
+        <div class="upc-stat-label">Reputation</div>
+      </div>
+      <div class="upc-stat">
+        <div class="upc-stat-val">${profile.totalReports}</div>
+        <div class="upc-stat-label">Reports</div>
+      </div>
+      <div class="upc-stat">
+        <div class="upc-stat-val">${profile.totalConfirmations}</div>
+        <div class="upc-stat-label">Confirms</div>
+      </div>
+    </div>
+    <div class="upc-footer">
+      <span class="upc-meta">Member since ${formatMemberSince(profile.memberSince)}${profile.verifiedIncidents > 0 ? ` · ${profile.verifiedIncidents} verified` : ''}</span>
+      <span class="upc-online">
+        <span class="upc-online-dot" style="background:${onlineColor};box-shadow:0 0 4px ${onlineColor};"></span>
+        <span style="color:${onlineColor};">${onlineLabel}</span>
+      </span>
+    </div>
+  `;
+}
+
+function createFamilyEl(uid: string, name: string, role: string, isOnline: boolean): HTMLDivElement {
   const color = role === 'kid' ? Colors.warning : role === 'admin' ? Colors.primary : Colors.secondary;
   const initial = name.charAt(0).toUpperCase();
   const el = document.createElement('div');
-  el.style.cssText = `opacity:${isOnline ? 1 : 0.4};display:flex;flex-direction:column;align-items:center;position:relative;`;
+  el.style.cssText = `opacity:${isOnline ? 1 : 0.4};display:flex;flex-direction:column;align-items:center;position:relative;cursor:pointer;`;
+
   el.innerHTML = `
     <div style="width:30px;height:30px;background:${color}30;border:2px solid ${color};border-radius:50%;
       display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px ${color}60;
-      font-size:13px;font-weight:700;color:${color};font-family:sans-serif;">${initial}</div>
+      font-size:13px;font-weight:700;color:${color};font-family:sans-serif;transition:all 0.2s ease;">${initial}</div>
     <div style="margin-top:2px;font-size:8px;color:${color};font-family:sans-serif;font-weight:600;
       text-shadow:0 0 4px #000,0 1px 2px #000;white-space:nowrap;">${name.split(' ')[0]}</div>
     ${isOnline ? `<div style="position:absolute;top:-2px;right:-2px;width:7px;height:7px;
       background:${Colors.success};border-radius:50%;border:1.5px solid #0d1117;box-shadow:0 0 4px ${Colors.success};"></div>` : ''}`;
+
+  const profile = MOCK_USER_PROFILES[uid];
+  if (profile) {
+    const card = document.createElement('div');
+    card.className = 'user-profile-card';
+    card.innerHTML = buildProfileCardHTML(profile);
+    el.appendChild(card);
+
+    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+    el.addEventListener('mouseenter', () => {
+      hoverTimeout = setTimeout(() => {
+        card.classList.add('visible');
+        el.style.zIndex = '9999';
+        const circle = el.querySelector('div:first-child') as HTMLElement;
+        if (circle) { circle.style.transform = 'scale(1.2)'; circle.style.boxShadow = `0 0 16px ${color}`; }
+      }, 200);
+    });
+    el.addEventListener('mouseleave', () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+      card.classList.remove('visible');
+      el.style.zIndex = '';
+      const circle = el.querySelector('div:first-child') as HTMLElement;
+      if (circle) { circle.style.transform = 'scale(1)'; circle.style.boxShadow = `0 0 8px ${color}60`; }
+    });
+  }
+
   return el;
 }
 
@@ -538,7 +689,7 @@ export function AttentionMap({
     if (!familyMembers) return;
     familyMembers.forEach((m) => {
       if (!m.location || m.uid === 'mock-user-001') return;
-      const el = createFamilyEl(m.displayName, m.role, m.isOnline ?? false);
+      const el = createFamilyEl(m.uid, m.displayName, m.role, m.isOnline ?? false);
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([m.location.longitude, m.location.latitude])
         .addTo(map);

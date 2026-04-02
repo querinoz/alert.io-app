@@ -230,6 +230,115 @@ export const MOCK_FAMILY_MEMBERS: FamilyMember[] = [
   },
 ];
 
+export interface UserProfileCard {
+  uid: string;
+  displayName: string;
+  photoURL: string | null;
+  reputation: number;
+  level: number;
+  levelName: string;
+  levelIcon: string;
+  badge: string;
+  badgeColor: string;
+  isGuardian: boolean;
+  totalReports: number;
+  totalConfirmations: number;
+  verifiedIncidents: number;
+  memberSince: number;
+  lastActive: number;
+  fame: string;
+  role?: string;
+  batteryLevel?: number;
+  isOnline?: boolean;
+}
+
+export const MOCK_USER_PROFILES: Record<string, UserProfileCard> = {
+  'mock-user-001': {
+    uid: 'mock-user-001',
+    displayName: 'Eduardo Q.',
+    photoURL: null,
+    reputation: 203750,
+    level: 31,
+    levelName: 'Guardian',
+    levelIcon: '🛡️',
+    badge: 'Guardian',
+    badgeColor: '#00FFAA',
+    isGuardian: true,
+    totalReports: 1842,
+    totalConfirmations: 5670,
+    verifiedIncidents: 312,
+    memberSince: Date.now() - 365 * 86400000,
+    lastActive: Date.now(),
+    fame: 'Legendary Protector',
+    role: 'admin',
+    batteryLevel: 85,
+    isOnline: true,
+  },
+  'family-member-002': {
+    uid: 'family-member-002',
+    displayName: 'Patricia Querino',
+    photoURL: null,
+    reputation: 8450,
+    level: 14,
+    levelName: 'Neighborhood Guardian',
+    levelIcon: '🏰',
+    badge: 'Guardião da Vizinhança',
+    badgeColor: '#EAB308',
+    isGuardian: false,
+    totalReports: 267,
+    totalConfirmations: 892,
+    verifiedIncidents: 0,
+    memberSince: Date.now() - 280 * 86400000,
+    lastActive: Date.now() - 1200000,
+    fame: 'Trusted Watcher',
+    role: 'member',
+    batteryLevel: 63,
+    isOnline: true,
+  },
+  'family-member-003': {
+    uid: 'family-member-003',
+    displayName: 'Lucas Querino',
+    photoURL: null,
+    reputation: 350,
+    level: 4,
+    levelName: 'Community Scout',
+    levelIcon: '👀',
+    badge: 'Olheiro Comunitário',
+    badgeColor: '#A78BFA',
+    isGuardian: false,
+    totalReports: 18,
+    totalConfirmations: 45,
+    verifiedIncidents: 0,
+    memberSince: Date.now() - 90 * 86400000,
+    lastActive: Date.now() - 300000,
+    fame: 'Rising Star',
+    role: 'kid',
+    batteryLevel: 72,
+    isOnline: true,
+  },
+  'family-member-004': {
+    uid: 'family-member-004',
+    displayName: 'Sofia Querino',
+    photoURL: null,
+    reputation: 2800,
+    level: 9,
+    levelName: 'Corner Guardian',
+    levelIcon: '🚦',
+    badge: 'Guardião de Esquina',
+    badgeColor: '#EC4899',
+    isGuardian: false,
+    totalReports: 134,
+    totalConfirmations: 412,
+    verifiedIncidents: 0,
+    memberSince: Date.now() - 200 * 86400000,
+    lastActive: Date.now() - 7200000,
+    fame: 'Reliable Reporter',
+    role: 'member',
+    batteryLevel: 14,
+    isOnline: false,
+  },
+};
+
 export const MOCK_FEED: FeedItem[] = [
   {
     id: 'feed-001',
