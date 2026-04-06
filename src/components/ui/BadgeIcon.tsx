@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useA11y } from '../../hooks/useAccessibility';
 import { Spacing } from '../../theme/spacing';
 import { getBadgeForLevel } from '../../constants/badges';
@@ -63,11 +63,9 @@ export function BadgeIcon({ level, size = 'md', showName }: BadgeIconProps) {
                 backgroundColor: badge.glowColor + '35',
                 borderColor: badge.color,
                 borderWidth: isGuardian ? 2 : 1.5,
-                shadowColor: badge.glowColor,
-                shadowOpacity: isGuardian ? 1 : 0.7,
-                shadowRadius: isGuardian ? 16 : 10,
-                shadowOffset: { width: 0, height: 0 },
-                elevation: isGuardian ? 12 : 6,
+                ...(Platform.OS === 'web'
+                  ? { boxShadow: `0 0 ${isGuardian ? 16 : 10}px ${badge.glowColor}${isGuardian ? '' : 'B3'}` }
+                  : { shadowColor: badge.glowColor, shadowOpacity: isGuardian ? 1 : 0.7, shadowRadius: isGuardian ? 16 : 10, shadowOffset: { width: 0, height: 0 }, elevation: isGuardian ? 12 : 6 }),
               },
             ]}
           >

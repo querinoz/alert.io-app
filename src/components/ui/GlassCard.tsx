@@ -47,14 +47,19 @@ export function GlassCard({ children, style, noPadding, glowColor, accessibility
             : colors.glass.border,
         },
         Platform.OS === 'web' && styles.webGlass,
-        glowColor && {
-          borderColor: hovered ? glowColor : glowColor + 'AA',
-          shadowColor: glowColor,
-          shadowOpacity: hovered ? 0.5 : 0.3,
-          shadowRadius: hovered ? 24 : 16,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: 10,
-        },
+        glowColor && (Platform.OS === 'web'
+          ? {
+              borderColor: hovered ? glowColor : glowColor + 'AA',
+              boxShadow: `0 2px ${hovered ? 24 : 16}px ${glowColor}${hovered ? '80' : '4D'}`,
+            } as any
+          : {
+              borderColor: hovered ? glowColor : glowColor + 'AA',
+              shadowColor: glowColor,
+              shadowOpacity: hovered ? 0.5 : 0.3,
+              shadowRadius: hovered ? 24 : 16,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 10,
+            }),
         !noPadding && styles.padding,
         style,
       ]}

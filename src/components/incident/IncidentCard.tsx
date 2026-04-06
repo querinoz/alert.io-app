@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, Animated, TextInput, FlatList } from 'react-native';
+import { View, StyleSheet, Pressable, Animated, TextInput, FlatList, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { GlassCard } from '../ui/GlassCard';
 import { NeonText } from '../ui/NeonText';
@@ -134,7 +134,7 @@ export function IncidentCard({ incident, onPress, compact }: IncidentCardProps) 
                 {timeAgo(incident.createdAt)}
               </NeonText>
             </View>
-            <View style={[styles.severityDot, { backgroundColor: sevColor, shadowColor: sevColor }]} />
+            <View style={[styles.severityDot, { backgroundColor: sevColor, ...(Platform.OS === 'web' ? { boxShadow: `0 0 4px ${sevColor}CC` } : { shadowColor: sevColor }) } as any]} />
           </View>
 
           <View style={styles.titleRow}>
@@ -333,9 +333,9 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? {} as any
+      : { shadowOpacity: 0.8, shadowRadius: 4, elevation: 4 }),
   },
   titleRow: {
     flexDirection: 'row',

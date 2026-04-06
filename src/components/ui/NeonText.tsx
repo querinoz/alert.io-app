@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextStyle, StyleProp, TextProps } from 'react-native';
+import { Text, TextStyle, StyleProp, TextProps, Platform } from 'react-native';
 import { useA11y } from '../../hooks/useAccessibility';
 
 interface NeonTextProps extends TextProps {
@@ -8,6 +8,17 @@ interface NeonTextProps extends TextProps {
   glow?: string;
   style?: StyleProp<TextStyle>;
   children: React.ReactNode;
+}
+
+function getGlowStyle(glow: string): any {
+  if (Platform.OS === 'web') {
+    return { textShadow: `0 0 12px ${glow}` };
+  }
+  return {
+    textShadowColor: glow,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+  };
 }
 
 export function NeonText({
@@ -25,11 +36,7 @@ export function NeonText({
       style={[
         typography[variant],
         { color: color ?? colors.textPrimary },
-        glow && {
-          textShadowColor: glow,
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: 12,
-        },
+        glow ? getGlowStyle(glow) : undefined,
         style,
       ]}
       {...rest}

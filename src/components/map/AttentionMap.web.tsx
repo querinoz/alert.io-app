@@ -71,12 +71,12 @@ function injectMapStyles() {
   const style = document.createElement('style');
   style.id = 'attention-map-styles';
   style.textContent = `
-    @keyframes marker-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+    @keyframes marker-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
     @keyframes user-glow-pulse { 0%,100% { transform: scale(1); opacity:0.5; } 50% { transform: scale(1.6); opacity:0; } }
     @keyframes scan-pulse { 0% { transform: scale(0.3); opacity:0.5; } 100% { transform: scale(1); opacity:0; } }
-    .attn-marker { cursor: pointer; transition: transform 0.25s cubic-bezier(.25,.8,.25,1), opacity 0.2s ease, visibility 0.15s ease, filter 0.25s ease; transform-origin: center center; overflow: visible; }
-    .attn-marker:hover { transform: scale(1.25) !important; z-index: 500 !important; filter: brightness(1.3) drop-shadow(0 0 8px rgba(255,255,255,0.3)) !important; }
-    .attn-marker.selected { animation: marker-pulse 1.5s ease-in-out infinite; z-index: 90 !important; }
+    .attn-marker { cursor: pointer; transition: opacity 0.2s ease, visibility 0.15s ease; transform-origin: center center; overflow: visible; }
+    .attn-marker:hover { z-index: 500 !important; }
+    .attn-marker.selected { z-index: 90 !important; }
     .hover-popup .maplibregl-popup-content { min-width: 180px !important; background: rgba(12,12,24,0.97) !important; border: 1px solid rgba(255,255,255,0.08) !important; pointer-events: none; }
     .hover-popup .maplibregl-popup-tip { border-top-color: rgba(12,12,24,0.97) !important; }
     .hover-popup .maplibregl-popup-close-button { display: none !important; }
@@ -104,7 +104,7 @@ function injectMapStyles() {
     }
     .map-ctrl-btn:hover { border-color: rgba(0,170,255,0.4); }
     .map-ctrl-btn.active { border-color: ${Colors.primary}; background: ${Colors.primary}20 !important; }
-    .capital-marker:hover { transform: scale(1.3); z-index: 50 !important; }
+    .capital-marker:hover { z-index: 50 !important; }
     .capital-marker:hover div:last-child { max-width: 120px !important; font-size: 8px !important; color: rgba(255,255,255,0.95) !important; }
 
     .incident-popup { padding: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
@@ -165,10 +165,10 @@ function injectMapStyles() {
       display: flex; align-items: center; justify-content: center;
       background: rgba(0,170,255,0.15); border: 1.5px solid rgba(0,170,255,0.6);
       backdrop-filter: blur(4px); animation: cam-pulse 3s ease-in-out infinite;
-      transition: transform 0.2s ease; transform-origin: center center;
+      transform-origin: center center;
       font-size: 14px; line-height: 1;
     }
-    .pub-cam-marker:hover { transform: scale(1.3); z-index: 500 !important; border-color: rgba(0,170,255,1); filter: brightness(1.3) drop-shadow(0 0 8px rgba(0,170,255,0.5)); }
+    .pub-cam-marker:hover { z-index: 500 !important; border-color: rgba(0,170,255,1); }
     .cam-popup { padding: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     .cam-popup h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #fff; }
     .cam-popup .cam-meta { font-size: 10px; color: #8A8A9A; margin-bottom: 8px; }
@@ -540,8 +540,8 @@ function createCapitalEl(flag: string, city: string): HTMLDivElement {
 
 export function AttentionMap({
   markers, userLocation, familyMembers, onMarkerPress, onMapPress, onMapReady,
-  selectedMarkerId, highlightedMarkerId, guardScan, lightTheme, navigation, driveMode, speedCameras,
-  initialRegion, focusLocation, cameras, onCameraPress, showCameras, onToggleCameras,
+  selectedMarkerId, highlightedMarkerId, guardScan, navigation, driveMode, speedCameras,
+  initialRegion, focusLocation, cameras, onCameraPress,
 }: AttentionMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const glMap = useRef<any>(null);
@@ -826,19 +826,17 @@ export function AttentionMap({
     declutterIncidentMarkers();
   }, [markers, selectedMarkerId, driveMode]);
 
-  // Highlight marker on hover from sidebar nearby list
+  // Highlight marker on hover from sidebar nearby list — glow only, no movement
   useEffect(() => {
     markersRef.current.forEach((m: any) => {
       const el = m.getElement();
       if (!el) return;
       const id = m._incidentId;
       if (id === highlightedMarkerId) {
-        el.style.filter = 'brightness(1.6) drop-shadow(0 0 12px rgba(0,255,136,0.8))';
+        el.style.filter = 'brightness(1.5) drop-shadow(0 0 10px rgba(0,255,136,0.7))';
         el.style.zIndex = '300';
-        el.style.transform = 'scale(1.35)';
       } else {
         el.style.filter = '';
-        el.style.transform = '';
         if (!el.classList.contains('selected')) {
           el.style.zIndex = '100';
         }
@@ -959,8 +957,8 @@ export function AttentionMap({
     const loc = userLocationRef.current;
     if (loc) {
       const userPt = map.project([loc.longitude, loc.latitude]);
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
           occupied.add(`${Math.floor(userPt.x / gridSize) + dx},${Math.floor(userPt.y / gridSize) + dy}`);
         }
       }
@@ -1020,6 +1018,7 @@ export function AttentionMap({
       if (map.getSource('guard-scan')) {
         if (map.getLayer('guard-scan-fill')) map.removeLayer('guard-scan-fill');
         if (map.getLayer('guard-scan-line')) map.removeLayer('guard-scan-line');
+        if (map.getLayer('guard-scan-line-dash')) map.removeLayer('guard-scan-line-dash');
         map.removeSource('guard-scan');
       }
       return;
@@ -1028,17 +1027,33 @@ export function AttentionMap({
     const coords = circlePolygon([guardScan.center.longitude, guardScan.center.latitude], guardScan.radiusMeters);
     const data = { type: 'Feature' as const, geometry: { type: 'Polygon' as const, coordinates: [coords] }, properties: {} };
 
+    const fillOpacity = guardScan.scanning ? 0.14 : 0.06;
+    const lineOpacity = guardScan.scanning ? 0.9 : 0.7;
+    const lineWidth = guardScan.scanning ? 2.5 : 2;
+
     if (map.getSource('guard-scan')) {
       (map.getSource('guard-scan') as any).setData(data);
-      if (map.getLayer('guard-scan-fill')) {
-        map.setPaintProperty('guard-scan-fill', 'fill-opacity', guardScan.scanning ? 0.1 : 0.04);
+      if (map.getLayer('guard-scan-fill')) map.setPaintProperty('guard-scan-fill', 'fill-opacity', fillOpacity);
+      if (map.getLayer('guard-scan-line')) {
+        map.setPaintProperty('guard-scan-line', 'line-opacity', lineOpacity);
+        map.setPaintProperty('guard-scan-line', 'line-width', lineWidth);
       }
     } else {
       try {
         map.addSource('guard-scan', { type: 'geojson', data });
-        map.addLayer({ id: 'guard-scan-fill', type: 'fill', source: 'guard-scan', paint: { 'fill-color': Colors.primary, 'fill-opacity': guardScan.scanning ? 0.1 : 0.04 } });
-        map.addLayer({ id: 'guard-scan-line', type: 'line', source: 'guard-scan', paint: { 'line-color': Colors.primary, 'line-width': 2, 'line-opacity': 0.6 } });
-      } catch (_) { /* style not loaded yet, will be added on style.load */ }
+        map.addLayer({
+          id: 'guard-scan-fill', type: 'fill', source: 'guard-scan',
+          paint: { 'fill-color': Colors.primary, 'fill-opacity': fillOpacity },
+        });
+        map.addLayer({
+          id: 'guard-scan-line', type: 'line', source: 'guard-scan',
+          paint: { 'line-color': Colors.primary, 'line-width': lineWidth, 'line-opacity': lineOpacity },
+        });
+        map.addLayer({
+          id: 'guard-scan-line-dash', type: 'line', source: 'guard-scan',
+          paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': 0.15, 'line-dasharray': [4, 6] },
+        });
+      } catch (_) { /* style not loaded yet */ }
     }
   }, [guardScan?.active, guardScan?.radiusMeters, guardScan?.scanning, guardScan?.center?.latitude, guardScan?.center?.longitude]);
 
@@ -1106,13 +1121,13 @@ export function AttentionMap({
     });
   }, [speedCameras]);
 
-  // Public cameras with hover tooltips and viewport culling
+  // Public cameras — always visible and fixed on map
   useEffect(() => {
     const map = glMap.current;
     if (!map || !loaded) return;
     publicCamMarkersRef.current.forEach((m: any) => m.remove());
     publicCamMarkersRef.current = [];
-    if (!cameras?.length || !showCameras) return;
+    if (!cameras?.length) return;
 
     const CAM_TYPE_COLORS: Record<string, string> = {
       traffic: '#FF9800', urban: '#00AAFF', coastal: '#00BCD4', nature: '#4CAF50', other: '#9E9E9E',
@@ -1144,7 +1159,6 @@ export function AttentionMap({
               <span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:${typeColor}18;color:${typeColor};border:1px solid ${typeColor}35">${typeLabel}</span>
               <span style="font-size:9px;color:#8B949E">${cam.country}</span>
               <span style="font-size:9px;color:#8B949E">· ${cam.quality === 'high' ? 'HD' : cam.quality === 'low' ? 'Baixa' : 'Padrão'}</span>
-              ${(cam as any).scene ? `<span style="font-size:8px;color:#555;margin-left:auto">${(cam as any).scene}</span>` : ''}
             </div>
             <div style="margin-top:6px;font-size:8px;color:#00FF88;font-weight:600;letter-spacing:.5px">CLIQUE PARA VER AO VIVO ▶</div>
           </div>`)
@@ -1167,47 +1181,7 @@ export function AttentionMap({
       (marker as any)._camData = cam;
       publicCamMarkersRef.current.push(marker);
     });
-
-    function updateCamVisibility() {
-      const z = map.getZoom();
-      const canvas = map.getCanvas();
-      const w = canvas.width;
-      const h = canvas.height;
-
-      const gridSize = z >= 14 ? 20 : z >= 11 ? 30 : z >= 8 ? 45 : 60;
-      const camOccupied = new Set<string>();
-
-      publicCamMarkersRef.current.forEach((m: any) => {
-        const el = m.getElement();
-        if (!el) return;
-        if (z < 6) { el.style.display = 'none'; return; }
-
-        const lngLat = m.getLngLat();
-        const pt = map.project(lngLat);
-
-        if (pt.x < -20 || pt.x > w + 20 || pt.y < -20 || pt.y > h + 20) {
-          el.style.display = 'none';
-          return;
-        }
-
-        const cellKey = `${Math.floor(pt.x / gridSize)},${Math.floor(pt.y / gridSize)}`;
-        if (camOccupied.has(cellKey)) {
-          el.style.display = 'none';
-        } else {
-          camOccupied.add(cellKey);
-          el.style.display = 'flex';
-          const scale = z < 10 ? 0.55 : z < 13 ? 0.7 : z < 16 ? 0.85 : 1;
-          el.style.transform = `scale(${scale})`;
-        }
-      });
-    }
-
-    map.on('zoom', updateCamVisibility);
-    map.on('moveend', updateCamVisibility);
-    updateCamVisibility();
-
-    return () => { map.off('zoom', updateCamVisibility); map.off('moveend', updateCamVisibility); };
-  }, [cameras, loaded, onCameraPress, showCameras]);
+  }, [cameras, loaded, onCameraPress]);
 
   // Drive mode
   useEffect(() => {

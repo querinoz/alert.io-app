@@ -19,8 +19,9 @@ import { useAccessibilityStore } from '../../src/stores/accessibilityStore';
 import { Colors } from '../../src/theme/colors';
 import { Spacing, Radius } from '../../src/theme/spacing';
 import { getCategoryMeta } from '../../src/constants/categories';
+import { getBadgeForReputation } from '../../src/constants/badges';
 import { timeAgo, formatDistance } from '../../src/services/mockData';
-import type { Incident, PublicCamera } from '../../src/types';
+import type { Incident, IncidentCategory, IncidentSeverity, PublicCamera } from '../../src/types';
 import { seedDatabase, IncidentDB } from '../../src/services/database';
 import { generateWorldIncidents } from '../../src/data/worldIncidents';
 import { generatePortugalIncidents } from '../../src/data/portugalIncidents';
@@ -34,6 +35,146 @@ import ChainScreen from './chain';
 
 const USER_LOCATION = { latitude: 41.2356, longitude: -8.6200 };
 const LANDING_PAGE_URL = 'http://localhost:8080';
+
+const GRADUAL_CATEGORIES: { cat: IncidentCategory; sev: IncidentSeverity; title: string; desc: string }[] = [
+  { cat: 'robbery', sev: 'high', title: 'Assalto na Rua de Santa Catarina', desc: 'Grupo de indivíduos armados avistados a assaltar uma loja de telemóveis.' },
+  { cat: 'accident', sev: 'critical', title: 'Colisão múltipla na VCI', desc: 'Engavetamento com 4 viaturas. Trânsito completamente parado no sentido Oeste.' },
+  { cat: 'suspicious', sev: 'medium', title: 'Indivíduo suspeito junto à escola', desc: 'Homem de capuz observando crianças à saída da escola durante vários minutos.' },
+  { cat: 'hazard', sev: 'high', title: 'Fuga de gás na Rua do Almada', desc: 'Forte cheiro a gás reportado por vários moradores. Evacuação em curso.' },
+  { cat: 'police', sev: 'medium', title: 'Operação STOP na Boavista', desc: 'PSP a realizar operação de fiscalização junto à rotunda da Boavista.' },
+  { cat: 'fire', sev: 'critical', title: 'Incêndio em edifício no Bonfim', desc: 'Fogo no 3º andar de prédio habitacional. Bombeiros no local.' },
+  { cat: 'medical', sev: 'high', title: 'Pessoa inconsciente na estação', desc: 'Pessoa caída sem sinais de consciência na estação de Metro da Trindade.' },
+  { cat: 'traffic', sev: 'low', title: 'Semáforo avariado em Paranhos', desc: 'Semáforo no cruzamento da Rua de Costa Cabral está intermitente.' },
+  { cat: 'noise', sev: 'low', title: 'Festa ruidosa na Cedofeita', desc: 'Música extremamente alta num apartamento. Já passa das 3 da manhã.' },
+  { cat: 'flood', sev: 'medium', title: 'Inundação na Rua da Alegria', desc: 'Chuva forte provocou acumulação de água. Estrada intransitável.' },
+  { cat: 'injured_animal', sev: 'low', title: 'Cão ferido junto ao rio Douro', desc: 'Cão de porte médio com pata partida encontrado no passeio ribeirinho.' },
+  { cat: 'building_risk', sev: 'high', title: 'Fachada a cair em Campanhã', desc: 'Pedaços de fachada a cair na via pública. Risco para peões.' },
+  { cat: 'robbery', sev: 'medium', title: 'Carteirista no Metro', desc: 'Grupo organizado a furtar carteiras na linha amarela do Metro.' },
+  { cat: 'accident', sev: 'high', title: 'Atropelamento na Foz', desc: 'Peão atropelado na passadeira junto ao Forte de S. João da Foz.' },
+  { cat: 'suspicious', sev: 'low', title: 'Veículo abandonado há 3 dias', desc: 'Carrinha branca sem matrícula estacionada na mesma posição há vários dias.' },
+  { cat: 'hazard', sev: 'medium', title: 'Poste de eletricidade inclinado', desc: 'Poste de alta tensão visivelmente inclinado após tempestade.' },
+  { cat: 'police', sev: 'high', title: 'Perseguição policial em Matosinhos', desc: 'Viatura em fuga da polícia pela marginal. Várias viaturas em perseguição.' },
+  { cat: 'fire', sev: 'high', title: 'Contentor de lixo em chamas', desc: 'Contentor do lixo a arder na Rua de Cedofeita. Risco de propagação.' },
+  { cat: 'medical', sev: 'medium', title: 'Queda de idoso no Bolhão', desc: 'Senhor idoso caiu nas escadas do mercado. Necessita assistência.' },
+  { cat: 'traffic', sev: 'medium', title: 'Obra bloqueia duas faixas na A1', desc: 'Obras de pavimentação reduzem a via a uma faixa. Filas de 3km.' },
+  { cat: 'noise', sev: 'low', title: 'Alarme de carro a tocar há horas', desc: 'Alarme de automóvel incessante na Rua do Heroísmo desde as 22h.' },
+  { cat: 'flood', sev: 'high', title: 'Ribeira do Porto alagada', desc: 'Nível do rio Douro subiu. Zona da Ribeira com água nas ruas.' },
+  { cat: 'injured_animal', sev: 'medium', title: 'Gato preso em árvore alta', desc: 'Gato preso no topo de uma árvore no Jardim da Cordoaria há 2 dias.' },
+  { cat: 'building_risk', sev: 'critical', title: 'Desabamento parcial de telhado', desc: 'Parte do telhado de edifício devoluto desabou na Rua das Flores.' },
+  { cat: 'robbery', sev: 'high', title: 'Assalto a farmácia em Ramalde', desc: 'Dois indivíduos encapuzados assaltaram farmácia. Fugiram a pé.' },
+  { cat: 'accident', sev: 'medium', title: 'Queda de motociclista na Circunvalação', desc: 'Motociclista derrapou em mancha de óleo. Ferimentos ligeiros.' },
+  { cat: 'suspicious', sev: 'high', title: 'Pacote suspeito na estação', desc: 'Mala abandonada na estação de São Bento. Área isolada pela PSP.' },
+  { cat: 'hazard', sev: 'low', title: 'Buraco grande na estrada', desc: 'Buraco no asfalto com 50cm de profundidade na Rua de Santos Pousada.' },
+  { cat: 'police', sev: 'low', title: 'Controlo de velocidade na IC1', desc: 'Radar da GNR ativo na IC1, sentido Porto-Lisboa, km 285.' },
+  { cat: 'fire', sev: 'medium', title: 'Fumo visível em terreno baldio', desc: 'Coluna de fumo a sair de terreno baldio em Gondomar.' },
+  { cat: 'medical', sev: 'critical', title: 'Paragem cardíaca no shopping', desc: 'Homem de 55 anos em paragem cardíaca no NorteShopping. DAE utilizado.' },
+  { cat: 'traffic', sev: 'high', title: 'Acidente na Ponte do Freixo', desc: 'Colisão entre camião e ligeiro. Uma faixa cortada no sentido Gaia.' },
+  { cat: 'other', sev: 'low', title: 'Grafiti ofensivo na escola', desc: 'Pichações com conteúdo ofensivo nos muros da escola secundária.' },
+  { cat: 'flood', sev: 'low', title: 'Esgoto entupido na Rua de Passos Manuel', desc: 'Água a transbordar de tampa de esgoto após chuva moderada.' },
+  { cat: 'injured_animal', sev: 'high', title: 'Cavalo solto na estrada', desc: 'Cavalo sem dono a vaguear pela EN15. Risco de acidente.' },
+  { cat: 'building_risk', sev: 'medium', title: 'Andaime instável em obra', desc: 'Andaime de construção civil a balançar com o vento na Rua do Bonjardim.' },
+  { cat: 'robbery', sev: 'low', title: 'Tentativa de furto em bicicleta', desc: 'Indivíduo a tentar cortar cadeado de bicicleta junto ao Parque da Cidade.' },
+  { cat: 'accident', sev: 'low', title: 'Choque ligeiro no parque', desc: 'Dois veículos chocaram a baixa velocidade no estacionamento do Bessa.' },
+  { cat: 'suspicious', sev: 'medium', title: 'Drone sobrevoando zona residencial', desc: 'Drone não autorizado a sobrevoar jardins privados na zona do Amial.' },
+  { cat: 'hazard', sev: 'critical', title: 'Derrame químico na zona industrial', desc: 'Líquido de cor esverdeada a escorrer de armazém em Perafita.' },
+  { cat: 'police', sev: 'medium', title: 'Manifestação no centro', desc: 'Manifestação pacífica na Avenida dos Aliados. Algumas ruas cortadas.' },
+  { cat: 'fire', sev: 'low', title: 'Churrasco fora de controlo', desc: 'Churrasco num terraço provocou alarme de incêndio no edifício.' },
+  { cat: 'medical', sev: 'low', title: 'Pessoa com mal-estar no jardim', desc: 'Mulher com tonturas no Jardim de São Lázaro. Já está acompanhada.' },
+  { cat: 'traffic', sev: 'low', title: 'Semáforos desligados na Constituição', desc: 'Cruzamento da Constituição com António Bernardino sem semáforos.' },
+  { cat: 'noise', sev: 'medium', title: 'Obras ilegais durante a noite', desc: 'Barulho de obras de construção às 23h num prédio em Lordelo.' },
+  { cat: 'other', sev: 'medium', title: 'Falta de iluminação pública', desc: 'Rua inteira sem candeeiros a funcionar na zona de Paranhos.' },
+  { cat: 'robbery', sev: 'critical', title: 'Assalto com faca na Ribeira', desc: 'Turista agredido com faca e roubado junto ao cais da Ribeira.' },
+  { cat: 'accident', sev: 'critical', title: 'Autocarro saiu da estrada', desc: 'Autocarro da STCP embateu em muro na descida da Batalha. Feridos.' },
+  { cat: 'suspicious', sev: 'high', title: 'Grupo a forçar entrada em garagem', desc: 'Três indivíduos a tentar forçar portão de garagem com ferramentas.' },
+  { cat: 'hazard', sev: 'medium', title: 'Árvore caída bloqueia estrada', desc: 'Árvore de grande porte caiu e bloqueia completamente a via.' },
+];
+
+function generateGradualIncidents(
+  userLat: number,
+  userLng: number,
+  count: number,
+): Incident[] {
+  const MIN_DIST_FROM_USER_KM = 0.15;
+  const MIN_DIST_BETWEEN_KM = 0.08;
+  const SPREAD_KM = 3.5;
+
+  const placed: { lat: number; lng: number }[] = [];
+  const result: Incident[] = [];
+
+  const distKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const x =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  };
+
+  const reporters = [
+    { name: 'Carlos M.', level: 8 }, { name: 'Ana R.', level: 12 }, { name: 'João P.', level: 5 },
+    { name: 'Maria S.', level: 15 }, { name: 'Pedro L.', level: 3 }, { name: 'Sofia T.', level: 9 },
+    { name: 'Miguel F.', level: 7 }, { name: 'Inês C.', level: 11 }, { name: 'Rui V.', level: 6 },
+    { name: 'Beatriz G.', level: 4 }, { name: 'Tiago A.', level: 10 }, { name: 'Laura D.', level: 14 },
+  ];
+
+  for (let i = 0; i < count; i++) {
+    let lat = 0, lng = 0, attempts = 0;
+    const ok = () => {
+      if (distKm({ lat, lng }, { lat: userLat, lng: userLng }) < MIN_DIST_FROM_USER_KM) return false;
+      for (const p of placed) {
+        if (distKm({ lat, lng }, p) < MIN_DIST_BETWEEN_KM) return false;
+      }
+      return true;
+    };
+
+    do {
+      const angle = Math.random() * 2 * Math.PI;
+      const r = MIN_DIST_FROM_USER_KM + Math.random() * SPREAD_KM;
+      lat = userLat + (r / 110.574) * Math.cos(angle);
+      lng = userLng + (r / (111.32 * Math.cos((userLat * Math.PI) / 180))) * Math.sin(angle);
+      attempts++;
+    } while (!ok() && attempts < 200);
+
+    placed.push({ lat, lng });
+
+    const tmpl = GRADUAL_CATEGORIES[i % GRADUAL_CATEGORIES.length];
+    const reporter = reporters[i % reporters.length];
+    const timeOffset = Math.random() * 3600000;
+
+    result.push({
+      id: `gradual-${i}-${Date.now()}`,
+      reporterUid: `grad-user-${i}`,
+      reporterName: reporter.name,
+      reporterLevel: reporter.level,
+      reporterBadge: reporter.level >= 10 ? 'Sentinela' : 'Observador',
+      category: tmpl.cat,
+      severity: tmpl.sev,
+      title: tmpl.title,
+      description: tmpl.desc,
+      location: { latitude: lat, longitude: lng },
+      geohash: 'gradual',
+      address: null,
+      photoURLs: [],
+      confirmCount: Math.floor(Math.random() * 8),
+      denyCount: Math.floor(Math.random() * 3),
+      credibilityScore: 40 + Math.floor(Math.random() * 50),
+      status: 'active',
+      isVerified: Math.random() > 0.7,
+      isFakeReport: false,
+      verifiedByUid: null,
+      verifiedByName: null,
+      views: Math.floor(Math.random() * 100),
+      commentCount: Math.floor(Math.random() * 5),
+      comments: [],
+      source: 'community',
+      createdAt: Date.now() - timeOffset,
+      expiresAt: Date.now() + 86400000,
+    });
+  }
+
+  return result;
+}
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -102,20 +243,7 @@ const FALLBACK_CAMERAS: SpeedCamera[] = [
   { id: 'cam-7', lat: 41.2290, lng: -8.6230, speedLimit: 50 },
 ];
 
-const FALLBACK_PUBLIC_CAMERAS: PublicCamera[] = [
-  { id: 'fc-1', name: 'New York — Times Square', lat: 40.758, lng: -73.9855, streamUrl: 'https://www.youtube.com/embed/AdUw5RdyZxI?autoplay=1&mute=1', type: 'urban', country: 'USA', quality: 'high' },
-  { id: 'fc-2', name: 'Tokyo — Shibuya Crossing', lat: 35.6595, lng: 139.7004, streamUrl: 'https://www.youtube.com/embed/3q2CnOmOPSA?autoplay=1&mute=1', type: 'urban', country: 'Japan', quality: 'high' },
-  { id: 'fc-3', name: 'Jackson Hole — Town Square', lat: 43.4799, lng: -110.7624, streamUrl: 'https://www.youtube.com/embed/1EiC9bvVGnk?autoplay=1&mute=1', type: 'urban', country: 'USA', quality: 'high' },
-  { id: 'fc-4', name: 'San Diego — Beaches 4K', lat: 32.7157, lng: -117.1611, streamUrl: 'https://www.youtube.com/embed/fFj4wnSTYtM?autoplay=1&mute=1', type: 'coastal', country: 'USA', quality: 'high' },
-  { id: 'fc-5', name: 'Miami — Biscayne Bay', lat: 25.7907, lng: -80.1300, streamUrl: 'https://www.youtube.com/embed/5YCajRjvWCg?autoplay=1&mute=1', type: 'coastal', country: 'USA', quality: 'high' },
-  { id: 'fc-6', name: 'Porto — Ribeira', lat: 41.1413, lng: -8.6130, streamUrl: 'https://www.skylinewebcams.com/webcam/portugal/north/porto/porto-ribeira.html', type: 'urban', country: 'Portugal', quality: 'standard' },
-  { id: 'fc-7', name: 'Lisboa — Praça do Comércio', lat: 38.7075, lng: -9.1364, streamUrl: 'https://www.skylinewebcams.com/webcam/portugal/center-south/lisbon/praca-do-comercio.html', type: 'urban', country: 'Portugal', quality: 'standard' },
-  { id: 'fc-8', name: 'Paris — Tour Eiffel', lat: 48.8584, lng: 2.2945, streamUrl: 'https://www.skylinewebcams.com/webcam/france/ile-de-france/paris/tour-eiffel.html', type: 'urban', country: 'France', quality: 'high' },
-  { id: 'fc-9', name: 'Roma — Fontana di Trevi', lat: 41.9009, lng: 12.4833, streamUrl: 'https://www.skylinewebcams.com/webcam/italia/lazio/roma/fontana-di-trevi.html', type: 'urban', country: 'Italy', quality: 'high' },
-  { id: 'fc-10', name: 'Barcelona — Port Vell', lat: 41.3818, lng: 2.1700, streamUrl: 'https://www.skylinewebcams.com/webcam/espana/comunidad-de-cataluna/barcelona/port-vell.html', type: 'coastal', country: 'Spain', quality: 'standard' },
-  { id: 'fc-11', name: 'Venice — St. Mark\'s Square', lat: 45.4343, lng: 12.3388, streamUrl: 'https://www.youtube.com/embed/vPsAzqrdJeo?autoplay=1&mute=1', type: 'urban', country: 'Italy', quality: 'high' },
-  { id: 'fc-12', name: 'Nashville — Broadway', lat: 36.1627, lng: -86.7816, streamUrl: 'https://www.youtube.com/embed/9VDGk2LvI_0?autoplay=1&mute=1', type: 'urban', country: 'USA', quality: 'high' },
-];
+// Cameras now fully managed by cameraService.ts with verified embeddable streams
 
 
 const RADIUS_OPTIONS = [
@@ -185,74 +313,87 @@ function TopBarIcon({ icon, label, active, onPress, color, badge, compact }: {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <Pressable
-      onPress={onPress}
-      // @ts-ignore web-only
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={({ pressed }) => ({
-        flexDirection: 'row' as const,
-        alignItems: 'center' as const,
-        gap: compact ? 0 : 6,
-        height: 34,
-        paddingHorizontal: compact ? 0 : active ? 12 : hovered ? 10 : 8,
-        paddingVertical: 0,
-        borderRadius: 10,
-        backgroundColor: active
-          ? color + '18'
-          : hovered
-            ? color + '0C'
-            : 'transparent',
-        borderWidth: 1,
-        borderColor: active
-          ? color + '45'
-          : hovered
-            ? color + '25'
-            : 'rgba(255,255,255,0.04)',
-        transform: [{ scale: pressed ? 0.92 : hovered ? 1.04 : 1 }],
-        shadowColor: color,
-        shadowOpacity: active ? 0.5 : hovered ? 0.3 : 0,
-        shadowRadius: active ? 14 : hovered ? 10 : 0,
-        shadowOffset: { width: 0, height: 0 } as any,
-        ...(Platform.OS === 'web'
-          ? {
-              transition: 'all 0.25s cubic-bezier(0.25,0.8,0.25,1)',
-              cursor: 'pointer',
-              width: compact ? 34 : 'auto',
-              justifyContent: compact ? 'center' : 'flex-start',
-            } as any
-          : {}),
-        position: 'relative' as const,
-      })}
-      accessible accessibilityLabel={label} accessibilityRole="button"
-    >
-      <MaterialCommunityIcons
-        name={icon as any}
-        size={compact ? 18 : 16}
-        color={active ? color : hovered ? color : '#8A8AAA'}
-      />
-      {!compact && (
-        <NeonText
-          variant="caption"
-          color={active ? color : hovered ? color : '#8A8AAA'}
-          style={{
-            fontSize: 10,
-            fontWeight: active ? '800' : '600',
-            letterSpacing: 0.4,
-            ...(Platform.OS === 'web' ? { transition: 'color 0.2s ease' } as any : {}),
-          }}
-        >
-          {label}
-        </NeonText>
-      )}
-      {badge && (
+    <View style={{ position: 'relative' as const, flex: compact ? 1 : undefined, alignItems: 'center' as const }}>
+      {compact && hovered && (
         <View style={{
-          position: 'absolute' as const, top: 3, right: 3, width: 7, height: 7,
-          borderRadius: 4, backgroundColor: Colors.primary,
-          shadowColor: Colors.primary, shadowOpacity: 0.8, shadowRadius: 3,
-        }} />
+          position: 'absolute' as const, bottom: -22, zIndex: 100,
+          backgroundColor: 'rgba(16,16,30,0.96)', paddingHorizontal: 7, paddingVertical: 2,
+          borderRadius: 5, borderWidth: 1, borderColor: color + '30',
+          ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap', pointerEvents: 'none' } as any : {}),
+        }}>
+          <NeonText variant="caption" color={color} style={{ fontSize: 8, fontWeight: '700', letterSpacing: 0.3 }}>{label}</NeonText>
+        </View>
       )}
-    </Pressable>
+      <Pressable
+        onPress={onPress}
+        // @ts-ignore web-only
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={({ pressed }) => ({
+          flexDirection: 'row' as const,
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+          gap: compact ? 0 : 6,
+          height: compact ? 32 : 34,
+          paddingHorizontal: compact ? 0 : active ? 12 : hovered ? 10 : 8,
+          borderRadius: compact ? 8 : 10,
+          backgroundColor: active
+            ? color + '18'
+            : hovered
+              ? color + '0C'
+              : 'transparent',
+          borderWidth: 1,
+          borderColor: active
+            ? color + '45'
+            : hovered
+              ? color + '25'
+              : 'rgba(255,255,255,0.04)',
+          transform: [{ scale: pressed ? 0.90 : hovered ? 1.06 : 1 }],
+          shadowColor: color,
+          shadowOpacity: active ? 0.5 : hovered ? 0.3 : 0,
+          shadowRadius: active ? 14 : hovered ? 10 : 0,
+          shadowOffset: { width: 0, height: 0 } as any,
+          ...(Platform.OS === 'web'
+            ? {
+                transition: 'all 0.25s cubic-bezier(0.25,0.8,0.25,1)',
+                cursor: 'pointer',
+                width: compact ? '100%' : 'auto',
+              } as any
+            : {}),
+          position: 'relative' as const,
+        })}
+        accessible accessibilityLabel={label} accessibilityRole="button"
+      >
+        <MaterialCommunityIcons
+          name={icon as any}
+          size={compact ? 16 : 16}
+          color={active ? color : hovered ? color : '#8A8AAA'}
+        />
+        {!compact && (
+          <NeonText
+            variant="caption"
+            color={active ? color : hovered ? color : '#8A8AAA'}
+            style={{
+              fontSize: 10,
+              fontWeight: active ? '800' : '600',
+              letterSpacing: 0.4,
+              ...(Platform.OS === 'web' ? { transition: 'color 0.2s ease' } as any : {}),
+            }}
+          >
+            {label}
+          </NeonText>
+        )}
+        {badge && (
+          <View style={{
+            position: 'absolute' as const, top: 2, right: 2, width: 6, height: 6,
+            borderRadius: 3, backgroundColor: Colors.primary,
+            ...(Platform.OS === 'web'
+              ? { boxShadow: `0 0 3px ${Colors.primary}CC` }
+              : { shadowColor: Colors.primary, shadowOpacity: 0.8, shadowRadius: 3 }),
+          } as any} />
+        )}
+      </Pressable>
+    </View>
   );
 }
 
@@ -265,8 +406,9 @@ const fabStyles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap', pointerEvents: 'none' } as any : {}),
   },
   btn: {
-    width: 44, height: 44, borderRadius: 14, borderWidth: 1,
+    width: 46, height: 46, borderRadius: 14, borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
+    minWidth: 46, minHeight: 46,
     ...(Platform.OS === 'web' ? { transition: 'all 0.28s cubic-bezier(0.25,0.8,0.25,1)', cursor: 'pointer' } as any : {}),
   },
 });
@@ -274,8 +416,8 @@ const fabStyles = StyleSheet.create({
 export default function MapScreen() {
   const { colors } = useA11y();
   const haptics = useHaptics();
-  const { showSidebar, sidebarWidth } = useResponsive();
-  const { incidents, selectedIncident, isLoading, loadIncidents, loadPublicData, refreshPublicData, selectIncident } = useIncidentStore();
+  const { showSidebar, sidebarWidth, isPhone, width: screenWidth } = useResponsive();
+  const { incidents, selectedIncident, isLoading, loadIncidents, loadPublicData, refreshPublicData, selectIncident, addIncidentDirect } = useIncidentStore();
   const user = useAuthStore((s) => s.user);
   const familyMembers = useFamilyStore((s) => s.members);
   const loadFamily = useFamilyStore((s) => s.loadFamily);
@@ -306,7 +448,7 @@ export default function MapScreen() {
   const [focusLocation, setFocusLocation] = useState<{ latitude: number; longitude: number; zoom?: number } | null>(null);
   const [publicCameras, setPublicCameras] = useState<PublicCamera[]>([]);
   const [viewingCamera, setViewingCamera] = useState<PublicCamera | null>(null);
-  const [showCameras, setShowCameras] = useState(false);
+  const [showCameras, setShowCameras] = useState(true);
   const [camerasLoading, setCamerasLoading] = useState(false);
   const [showTutorial, setShowTutorial] = useState(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -342,8 +484,8 @@ export default function MapScreen() {
       loadFamily();
       loadPublicData(USER_LOCATION.latitude, USER_LOCATION.longitude);
       fetchAllCameras()
-        .then((cams) => setPublicCameras(cams.length > 0 ? cams : FALLBACK_PUBLIC_CAMERAS))
-        .catch(() => setPublicCameras(FALLBACK_PUBLIC_CAMERAS));
+        .then((cams) => setPublicCameras(cams))
+        .catch(() => {});
       announce(`Mapa carregado com incidentes de Portugal e do mundo`);
     });
   }, []);
@@ -355,6 +497,22 @@ export default function MapScreen() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Gradually spawn 50 new incidents, one every 10 seconds
+  const gradualSpawnedRef = useRef(false);
+  useEffect(() => {
+    if (gradualSpawnedRef.current || incidents.length === 0) return;
+    gradualSpawnedRef.current = true;
+
+    const batch = generateGradualIncidents(USER_LOCATION.latitude, USER_LOCATION.longitude, 50);
+    let idx = 0;
+    const timer = setInterval(() => {
+      if (idx >= batch.length) { clearInterval(timer); return; }
+      addIncidentDirect(batch[idx]);
+      idx++;
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [incidents.length > 0]);
 
   // Cycle live feed items every 8 seconds
   useEffect(() => {
@@ -442,7 +600,7 @@ export default function MapScreen() {
     }
   }, [navRoute]);
 
-  const guardScan: GuardScanConfig | null = (scanning || scanDone)
+  const guardScan: GuardScanConfig | null = (scanOpen || scanning || scanDone)
     ? { active: true, scanning, radiusMeters: scanRadius, center: USER_LOCATION }
     : null;
 
@@ -551,10 +709,9 @@ export default function MapScreen() {
     setCamerasLoading(true);
     try {
       const cams = await fetchAllCameras();
-      setPublicCameras(cams.length > 0 ? cams : FALLBACK_PUBLIC_CAMERAS);
+      setPublicCameras(cams);
       setShowCameras(true);
     } catch {
-      setPublicCameras(FALLBACK_PUBLIC_CAMERAS);
       setShowCameras(true);
     } finally {
       setCamerasLoading(false);
@@ -1069,7 +1226,7 @@ export default function MapScreen() {
   const overlayPanel = activeOverlay ? (
     <View style={styles.overlayContainer}>
       <Pressable style={styles.overlayBackdrop} onPress={() => setActiveOverlay(null)} />
-      <View style={[styles.overlaySheet, {
+      <View style={[styles.overlaySheet, isPhone && styles.overlaySheetMobile, {
         backgroundColor: lightTheme ? 'rgba(250,252,255,0.82)' : 'rgba(10,10,24,0.78)',
         borderColor: lightTheme ? 'rgba(0,0,0,0.05)' : overlayMeta[activeOverlay].color + '18',
         ...(Platform.OS === 'web' ? {
@@ -1078,23 +1235,23 @@ export default function MapScreen() {
           animation: 'overlay-slide-in 0.3s cubic-bezier(0.16,1,0.3,1) both',
         } as any : {}),
       }]}>
-        <View style={[styles.overlayHeader, {
+        <View style={[styles.overlayHeader, isPhone && { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }, {
           borderBottomColor: lightTheme ? 'rgba(0,0,0,0.04)' : overlayMeta[activeOverlay].color + '12',
         }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{
-              width: 30, height: 30, borderRadius: 8,
+              width: isPhone ? 28 : 30, height: isPhone ? 28 : 30, borderRadius: 8,
               backgroundColor: overlayMeta[activeOverlay].color + '15',
               borderWidth: 1, borderColor: overlayMeta[activeOverlay].color + '30',
               justifyContent: 'center', alignItems: 'center',
             }}>
-              <MaterialCommunityIcons name={overlayMeta[activeOverlay].icon as any} size={16} color={overlayMeta[activeOverlay].color} />
+              <MaterialCommunityIcons name={overlayMeta[activeOverlay].icon as any} size={isPhone ? 14 : 16} color={overlayMeta[activeOverlay].color} />
             </View>
-            <NeonText variant="h4" color={colors.textPrimary} glow={overlayMeta[activeOverlay].color + '40'}>
+            <NeonText variant={isPhone ? 'body' : 'h4'} color={colors.textPrimary} glow={overlayMeta[activeOverlay].color + '40'} style={isPhone ? { fontWeight: '700' } : undefined}>
               {overlayMeta[activeOverlay].title}
             </NeonText>
           </View>
-          <Pressable onPress={() => setActiveOverlay(null)}
+          <Pressable onPress={() => setActiveOverlay(null)} hitSlop={8}
             style={({ pressed }) => [styles.overlayCloseBtn, {
               transform: [{ scale: pressed ? 0.88 : 1 }],
               backgroundColor: pressed ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
@@ -1104,7 +1261,7 @@ export default function MapScreen() {
             <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
           </Pressable>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isPhone ? 40 : 24 }}>
           {activeOverlay === 'family' ? <FamilyScreen /> : activeOverlay === 'chain' ? <ChainScreen /> : <ProfileScreen />}
         </ScrollView>
       </View>
@@ -1131,21 +1288,70 @@ export default function MapScreen() {
               <NeonText variant="h3" glow={colors.primaryGlow} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : 'monospace', letterSpacing: 2, fontWeight: '700' }}>ALERT<NeonText variant="h3" color={Colors.primary} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : 'monospace', fontWeight: '400' }}>.IO</NeonText></NeonText>
             </View>
             <NeonText variant="caption" color={colors.textSecondary} style={{ marginTop: 6, letterSpacing: 0.3 }}>{incidents.length} incidentes ativos por perto</NeonText>
-            {/* Navigation buttons - row 1: main actions */}
-            <View style={[styles.navButtonRow, { marginTop: 12, flexWrap: 'wrap', gap: 6 }]}>
-              <TopBarIcon icon="link-variant" label="Chain" active={activeOverlay === 'chain'} color="#FF9800" onPress={() => openOverlay('chain')} />
-              <TopBarIcon icon="account-group" label="Família" active={activeOverlay === 'family'} color={Colors.secondary} onPress={() => openOverlay('family')} />
-              <TopBarIcon icon="account-circle" label="Perfil" active={activeOverlay === 'profile'} color={Colors.primary} onPress={() => openOverlay('profile')} badge={user?.isGuardian} />
-            </View>
-            <View style={[styles.navButtonRow, { marginTop: 6, flexWrap: 'wrap', gap: 6 }]}>
-              <TopBarIcon icon="steering" label="Condução" active={driveMode} color="#00AAFF" onPress={toggleDriveMode} />
+            <View style={[styles.navButtonRow, { marginTop: 10, gap: 4 }]}>
+              <TopBarIcon icon="link-variant" label="Chain" active={activeOverlay === 'chain'} color="#FF9800" onPress={() => openOverlay('chain')} compact />
+              <TopBarIcon icon="account-group" label="Família" active={activeOverlay === 'family'} color={Colors.secondary} onPress={() => openOverlay('family')} compact />
+              <TopBarIcon icon="account-circle" label="Perfil" active={activeOverlay === 'profile'} color={Colors.primary} onPress={() => openOverlay('profile')} badge={user?.isGuardian} compact />
+              <TopBarIcon icon="steering" label="Condução" active={driveMode} color="#00AAFF" onPress={toggleDriveMode} compact />
               <TopBarIcon icon="web" label="alert.io" active={false} color="#9C27B0" onPress={() => {
                 if (Platform.OS === 'web' && typeof window !== 'undefined') {
                   window.open(LANDING_PAGE_URL, '_blank');
                 }
-              }} />
+              }} compact />
             </View>
           </View>
+
+          {/* ── Compact Profile Card ── */}
+          {user && (() => {
+            const badge = getBadgeForReputation(user.reputation);
+            return (
+              <View style={{
+                marginHorizontal: Spacing.lg, marginBottom: Spacing.sm,
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                paddingVertical: 10, paddingHorizontal: 12,
+                borderRadius: Radius.lg, borderWidth: 1,
+                borderColor: badge.color + '20',
+                backgroundColor: badge.color + '06',
+                ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease' } as any : {}),
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: badge.color + '18', borderWidth: 1.5, borderColor: badge.color + '40',
+                  justifyContent: 'center', alignItems: 'center',
+                }}>
+                  <NeonText style={{ fontSize: 18 }}>{badge.icon}</NeonText>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <NeonText variant="bodySm" color={colors.textPrimary} style={{ fontWeight: '700', fontSize: 12 }} numberOfLines={1}>
+                    {user.displayName}
+                  </NeonText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <NeonText variant="caption" color={badge.color} style={{ fontSize: 8, fontWeight: '700', letterSpacing: 0.3 }}>
+                      LV.{badge.level}
+                    </NeonText>
+                    <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: colors.textTertiary }} />
+                    <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 8 }} numberOfLines={1}>
+                      {badge.name}
+                    </NeonText>
+                  </View>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <MaterialCommunityIcons name="file-document-edit-outline" size={10} color={Colors.primary} />
+                    <NeonText variant="caption" color={Colors.primary} style={{ fontSize: 10, fontWeight: '800' }}>
+                      {user.totalReports}
+                    </NeonText>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <MaterialCommunityIcons name="star" size={10} color={badge.color} />
+                    <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 8 }}>
+                      {user.reputation.toLocaleString()} pts
+                    </NeonText>
+                  </View>
+                </View>
+              </View>
+            );
+          })()}
 
           {incidentDetail && (
             <GlassCard style={styles.sidebarDetail} glowColor={Colors.category[selectedIncident!.category] + '25'}>
@@ -1351,7 +1557,7 @@ export default function MapScreen() {
             <LogoMark size={20} color={Colors.primary} />
             <NeonText variant="h4" glow={colors.primaryGlow} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : 'monospace', letterSpacing: 2, fontWeight: '700' }}>ALERT<NeonText variant="h4" color={Colors.primary} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : 'monospace', fontWeight: '400' }}>.IO</NeonText></NeonText>
           </View>
-          <View style={[styles.navButtonRow, { marginTop: 6, flexWrap: 'wrap', gap: 5 }]}>
+          <View style={[styles.navButtonRow, { marginTop: 6, gap: isPhone ? 3 : 4 }]}>
             <TopBarIcon icon="link-variant" label="Chain" active={activeOverlay === 'chain'} color="#FF9800" onPress={() => openOverlay('chain')} compact />
             <TopBarIcon icon="account-group" label="Família" active={activeOverlay === 'family'} color={Colors.secondary} onPress={() => openOverlay('family')} compact />
             <TopBarIcon icon="account-circle" label="Perfil" active={activeOverlay === 'profile'} color={Colors.primary} onPress={() => openOverlay('profile')} badge={user?.isGuardian} compact />
@@ -1372,8 +1578,8 @@ export default function MapScreen() {
         }]}>
           <MapFab icon="plus" color={Colors.warning} label="Reportar" onPress={handleReportPress} />
           <MapFab icon="navigation-variant" color="#00AAFF" label="Navegar" active={navOpen} onPress={() => { haptics.medium(); setNavOpen(!navOpen); setScanOpen(false); }} />
-          <MapFab icon="radar" color={colors.primary} label="GuardScan" active={scanOpen} onPress={() => { haptics.medium(); setScanOpen(!scanOpen); setNavOpen(false); }} />
-          <MapFab icon="cctv" color="#00BCD4" label={camerasLoading ? 'A carregar...' : `Câmeras (${publicCameras.length})`} active={showCameras} onPress={toggleCameras} />
+          <MapFab icon="radar" color={colors.primary} label="Scan" active={scanOpen} onPress={() => { haptics.medium(); setScanOpen(!scanOpen); setNavOpen(false); }} />
+          <MapFab icon="cctv" color="#00BCD4" label={camerasLoading ? '...' : `📷${publicCameras.length > 0 ? ' ' + publicCameras.length : ''}`} active={showCameras} onPress={toggleCameras} />
         </View>
       )}
 
@@ -1425,35 +1631,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 10,
     borderRadius: 18, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 20,
-    shadowOffset: { width: 0, height: 4 }, elevation: 14,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 20px rgba(0,0,0,0.4)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 4 }, elevation: 14 }),
   },
   appNameBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: 10, borderWidth: 1,
-    shadowOpacity: 0.15, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 1 }, elevation: 3,
-    ...(Platform.OS === 'web' ? { transition: 'all 0.3s ease' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { transition: 'all 0.3s ease', boxShadow: '0 1px 10px rgba(0,0,0,0.15)' } as any
+      : { shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 1 }, elevation: 3 }),
   },
   appNameBoxMobile: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: 8, borderWidth: 1,
-    shadowOpacity: 0.15, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 1 }, elevation: 3,
-    ...(Platform.OS === 'web' ? { transition: 'all 0.3s ease' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { transition: 'all 0.3s ease', boxShadow: '0 1px 8px rgba(0,0,0,0.15)' } as any
+      : { shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 1 }, elevation: 3 }),
   },
   navButtonRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 5,
   },
 
   navPanelPos: { position: 'absolute', top: 76, right: 16, zIndex: 16 },
-  navPanelPosMobile: { position: 'absolute', top: 80, left: 16, right: 16, zIndex: 16 },
+  navPanelPosMobile: { position: 'absolute', top: Platform.OS === 'ios' ? 100 : 80, left: 10, right: 10, zIndex: 16 },
   navPanel: {
     borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.md,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 14, elevation: 12,
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(14px)' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(14px)', boxShadow: '0 4px 14px rgba(0,0,0,0.3)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 14, elevation: 12 }),
     minWidth: 280,
   },
   navSearchRow: { flexDirection: 'row', gap: 6, marginBottom: Spacing.sm },
@@ -1487,11 +1695,12 @@ const styles = StyleSheet.create({
   navIncidentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2, gap: 8 },
 
   scanPanelPos: { position: 'absolute', top: 76, right: 16, zIndex: 15 },
-  scanPanelPosMobile: { position: 'absolute', top: 80, left: 16, right: 16, zIndex: 15 },
+  scanPanelPosMobile: { position: 'absolute', top: Platform.OS === 'ios' ? 100 : 80, left: 10, right: 10, zIndex: 15 },
   scanPanel: {
     borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.md,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, elevation: 10,
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(12px)', boxShadow: '0 4px 12px rgba(0,0,0,0.25)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, elevation: 10 }),
     minWidth: 240,
   },
   scanPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
@@ -1515,37 +1724,41 @@ const styles = StyleSheet.create({
   mobileContainer: { flex: 1, position: 'relative' },
   mobileTopBar: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : Platform.OS === 'android' ? 36 : 16,
-    paddingBottom: Spacing.md, paddingHorizontal: Spacing.md,
+    paddingTop: Platform.OS === 'ios' ? 54 : Platform.OS === 'android' ? 36 : 12,
+    paddingBottom: Spacing.sm, paddingHorizontal: Spacing.sm,
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', zIndex: 10,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 }, elevation: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 16px rgba(0,0,0,0.3)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 10 }),
   },
   mobileLeftFabs: { position: 'absolute', bottom: 90, left: 16, gap: Spacing.sm, zIndex: 20 },
   mobileBottomFabs: {
-    position: 'absolute', bottom: 24, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'center', gap: Spacing.md,
+    position: 'absolute', bottom: Platform.OS === 'ios' ? 30 : 16, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm,
     alignSelf: 'center',
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 22, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 18, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
-    shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 }, elevation: 16,
     zIndex: 20,
-    ...(Platform.OS === 'web' ? { width: 'fit-content', marginLeft: 'auto', marginRight: 'auto' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { width: 'fit-content', marginLeft: 'auto', marginRight: 'auto', maxWidth: '96%', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 16 }),
   },
   mobileFab: {
     display: 'none',
   },
   mobileSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '55%',
+    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '60%',
     borderTopLeftRadius: Radius['3xl'], borderTopRightRadius: Radius['3xl'],
-    paddingTop: Spacing.md,
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 28, elevation: 22, zIndex: 15,
+    paddingTop: Spacing.md, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    zIndex: 15,
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: 'rgba(255,255,255,0.06)',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 -8px 28px rgba(0,0,0,0.4)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 28, elevation: 22 }),
   },
   mobileSheetScroll: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.md },
@@ -1587,8 +1800,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 22, borderWidth: 1,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 12px rgba(0,0,0,0.2)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }),
   },
   driveDestBadge: {
     flexDirection: 'row', alignItems: 'center',
@@ -1596,8 +1810,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1, borderColor: 'rgba(0,255,170,0.15)',
     maxWidth: 200,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 6,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 3px 10px rgba(0,0,0,0.15)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 6 }),
   },
   driveTopRightControls: {
     position: 'absolute',
@@ -1617,8 +1832,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 12,
     borderRadius: 16, borderWidth: 1,
     marginBottom: 6, maxWidth: 380,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }),
   },
   driveBottomLeft: {
     position: 'absolute', bottom: 28, left: 20, zIndex: 26,
@@ -1626,8 +1842,9 @@ const styles = StyleSheet.create({
   driveSpeedLimitSign: {
     width: 60, height: 60, borderRadius: 30, borderWidth: 3.5,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FF3C3C', shadowOpacity: 0.25, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 2 }, elevation: 10,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 2px 12px rgba(255,60,60,0.25)' } as any
+      : { shadowColor: '#FF3C3C', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 10 }),
   },
   driveBottomRight: {
     position: 'absolute', bottom: 20, right: 16, zIndex: 26,
@@ -1637,8 +1854,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 28, paddingVertical: 12,
     borderRadius: 22, borderWidth: 1.5,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 }, elevation: 12,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 16px rgba(0,0,0,0.25)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 12 }),
   },
   driveNavStatsRow: {
     flexDirection: 'row', gap: 6,
@@ -1648,16 +1866,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6, paddingHorizontal: 10,
     borderRadius: 12, borderWidth: 1,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 }),
   } as any,
   driveControlBtn: {
     alignItems: 'center', justifyContent: 'center',
     paddingVertical: 10, paddingHorizontal: 10,
     borderRadius: 16, borderWidth: 1, minWidth: 56,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 6,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' } as any : {}),
+    ...(Platform.OS === 'web'
+      ? { cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)', boxShadow: '0 3px 10px rgba(0,0,0,0.15)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 6 }),
   },
 
   // Overlay for Family / Profile
@@ -1673,8 +1892,15 @@ const styles = StyleSheet.create({
   overlaySheet: {
     width: '92%', maxWidth: 520, maxHeight: '85%',
     borderRadius: 22, borderWidth: 1,
-    shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 32,
     overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 24px 48px rgba(0,0,0,0.6)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 32 }),
+  },
+  overlaySheetMobile: {
+    width: '100%', maxWidth: '100%', maxHeight: '100%',
+    borderRadius: 0,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
   },
   overlayHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

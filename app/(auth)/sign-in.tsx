@@ -203,10 +203,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoMarkWrap: {
-    shadowColor: Colors.primary,
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 0 20px rgba(0,255,136,0.5)' } as any
+      : { shadowColor: Colors.primary, shadowOpacity: 0.5, shadowRadius: 20, elevation: 10 }),
   },
   brandName: {
     textAlign: 'center',
@@ -254,7 +253,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    ...(Platform.OS === 'web' ? { transition: 'border-color 0.2s ease, box-shadow 0.2s ease', outline: 'none' } as any : {}),
+    ...(Platform.OS === 'web' ? { transition: 'border-color 0.2s ease, box-shadow 0.2s ease', outlineStyle: 'none' } as any : {}),
   },
   divider: {
     flexDirection: 'row',

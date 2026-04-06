@@ -118,11 +118,17 @@ export function NeonButton({
             backgroundColor: pressed ? v.bgPressed : hovered ? v.bgHover : v.bg,
             borderColor: disabled ? colors.textDisabled : pressed ? v.glow : hovered ? v.border : v.border,
             opacity: disabled ? 0.4 : 1,
-            shadowColor: v.glow,
-            shadowOpacity: variant === 'primary' && !disabled ? (pressed ? 0.9 : hovered ? 0.7 : 0.4) : 0,
-            shadowRadius: pressed ? 28 : hovered ? 20 : 14,
-            shadowOffset: { width: 0, height: pressed ? 2 : 4 },
-            elevation: variant === 'primary' ? (pressed ? 12 : 8) : 0,
+            ...(Platform.OS === 'web'
+              ? { boxShadow: variant === 'primary' && !disabled
+                  ? `0 ${pressed ? 2 : 4}px ${pressed ? 28 : hovered ? 20 : 14}px ${v.glow}${pressed ? 'E6' : hovered ? 'B3' : '66'}`
+                  : 'none' } as any
+              : {
+                  shadowColor: v.glow,
+                  shadowOpacity: variant === 'primary' && !disabled ? (pressed ? 0.9 : hovered ? 0.7 : 0.4) : 0,
+                  shadowRadius: pressed ? 28 : hovered ? 20 : 14,
+                  shadowOffset: { width: 0, height: pressed ? 2 : 4 },
+                  elevation: variant === 'primary' ? (pressed ? 12 : 8) : 0,
+                }),
           },
           fullWidth && styles.fullWidth,
         ]}

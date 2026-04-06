@@ -37,8 +37,8 @@ export default function ChainScreen() {
   const haptics = useHaptics();
   const user = useAuthStore((s) => s.user);
   const {
-    chains, activeChain, members, messages, alerts,
-    loadChains, selectChain, createChain, joinChain,
+    activeChain, members, messages, alerts,
+    loadChains, createChain, joinChain,
     addMember, sendMessage, sendAlert, triggerSOS, acknowledgeAlert,
   } = useChainStore();
 
@@ -438,7 +438,9 @@ const s = StyleSheet.create({
   sosBtn: {
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center',
-    shadowColor: Colors.error, shadowOpacity: 0.5, shadowRadius: 12, elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: `0 0 12px ${Colors.error}80` } as any
+      : { shadowColor: Colors.error, shadowOpacity: 0.5, shadowRadius: 12, elevation: 8 }),
   },
   tabs: {
     flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: Spacing.sm,

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Easing } from 'react-native';
+import { View, Animated, StyleSheet, Easing, Platform } from 'react-native';
 import { useA11y } from '../../hooks/useAccessibility';
 import { NeonText } from './NeonText';
 
@@ -107,9 +107,9 @@ export function LoadingRadar({ size = 120, message }: LoadingRadarProps) {
               left: halfSize - 1,
               transformOrigin: 'bottom',
               transform: [{ rotate }],
-              shadowColor: colors.primary,
-              shadowOpacity: 0.8,
-              shadowRadius: 6,
+              ...(Platform.OS === 'web'
+                ? { boxShadow: `0 0 6px ${colors.primary}CC` }
+                : { shadowColor: colors.primary, shadowOpacity: 0.8, shadowRadius: 6 }),
             },
           ]}
         />
@@ -123,9 +123,9 @@ export function LoadingRadar({ size = 120, message }: LoadingRadarProps) {
               height: 8,
               borderRadius: 4,
               backgroundColor: colors.primary,
-              shadowColor: colors.primary,
-              shadowOpacity: 1,
-              shadowRadius: 8,
+              ...(Platform.OS === 'web'
+                ? { boxShadow: `0 0 8px ${colors.primary}` }
+                : { shadowColor: colors.primary, shadowOpacity: 1, shadowRadius: 8 }),
             },
           ]}
         />

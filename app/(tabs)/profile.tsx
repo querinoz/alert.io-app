@@ -1,16 +1,15 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView, Platform, Pressable, Linking, Animated, Image } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
 import { NeonButton } from '../../src/components/ui/NeonButton';
 import { GlassCard } from '../../src/components/ui/GlassCard';
-import { BadgeIcon } from '../../src/components/ui/BadgeIcon';
 import { useA11y, announce } from '../../src/hooks/useAccessibility';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { useResponsive } from '../../src/hooks/useResponsive';
 import { useAuthStore } from '../../src/stores/authStore';
-import { getBadgeForReputation, getProgressToNextLevel } from '../../src/constants/badges';
+import { BADGES, getBadgeForReputation, getProgressToNextLevel } from '../../src/constants/badges';
 import { LogoMark } from '../../src/components/ui/LogoMark';
 import { Colors } from '../../src/theme/colors';
 import { Spacing, Radius } from '../../src/theme/spacing';
@@ -102,10 +101,9 @@ function EmergencyButton({ service }: { service: typeof EMERGENCY_SERVICES[numbe
           {
             backgroundColor: pressed ? service.color + '30' : service.color + '12',
             borderColor: service.color + '40',
-            shadowColor: pressed ? service.color : 'transparent',
-            shadowOpacity: pressed ? 0.5 : 0,
-            shadowRadius: 12,
-            elevation: pressed ? 8 : 0,
+            ...(Platform.OS === 'web'
+              ? { boxShadow: pressed ? `0 0 12px ${service.color}80` : 'none' }
+              : { shadowColor: pressed ? service.color : 'transparent', shadowOpacity: pressed ? 0.5 : 0, shadowRadius: 12, elevation: pressed ? 8 : 0 }),
           },
         ]}
         accessible
@@ -125,6 +123,171 @@ function EmergencyButton({ service }: { service: typeof EMERGENCY_SERVICES[numbe
     </Animated.View>
   );
 }
+
+function ProfileBadgeWithTooltip({ reputation }: { reputation: number }) {
+  const { colors } = useA11y();
+  const [hovered, setHovered] = useState(false);
+  const currentBadge = getBadgeForReputation(reputation);
+  const isWeb = Platform.OS === 'web';
+
+  const webHoverHandlers = isWeb
+    ? ({
+        onMouseEnter: () => setHovered(true),
+        onMouseLeave: () => setHovered(false),
+      } as any)
+    : {};
+
+  const tooltipWebGlass = isWeb
+    ? ({
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset',
+        cursor: 'default',
+      } as any)
+    : {};
+
+  return (
+    <View
+      style={badgeTooltipStyles.anchor}
+      {...webHoverHandlers}
+      accessibilityLabel={`Badge ${currentBadge.name}, nível ${currentBadge.level}`}
+    >
+      {isWeb && hovered && (
+        <View
+          style={[badgeTooltipStyles.floatingPanel, tooltipWebGlass]}
+          {...({
+            onMouseEnter: () => setHovered(true),
+            onMouseLeave: () => setHovered(false),
+          } as any)}
+        >
+          <NeonText variant="caption" color={colors.textTertiary} style={badgeTooltipStyles.tooltipTitle}>
+            Todos os níveis ({BADGES.length})
+          </NeonText>
+          <ScrollView
+            style={badgeTooltipStyles.tooltipScroll}
+            showsVerticalScrollIndicator={isWeb}
+            nestedScrollEnabled
+          >
+            <View style={badgeTooltipStyles.tooltipGrid}>
+              {BADGES.map((b) => {
+                const unlocked = reputation >= b.minReputation;
+                const isCurrent = b.badgeId === currentBadge.badgeId;
+                return (
+                  <View
+                    key={b.badgeId}
+                    style={[
+                      badgeTooltipStyles.tooltipCell,
+                      {
+                        opacity: unlocked ? 1 : 0.32,
+                        borderColor: isCurrent ? b.color + '70' : unlocked ? b.color + '28' : 'rgba(255,255,255,0.06)',
+                        backgroundColor: isCurrent ? b.color + '22' : unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.2)',
+                        ...(isWeb && isCurrent ? { boxShadow: `0 0 12px ${b.glowColor}44` } : {}),
+                      },
+                    ]}
+                  >
+                    <NeonText style={{ fontSize: isCurrent ? 18 : 14 }}>{b.icon}</NeonText>
+                    <NeonText
+                      variant="caption"
+                      color={isCurrent ? b.color : unlocked ? colors.textSecondary : colors.textTertiary}
+                      style={{ fontSize: 9, fontWeight: isCurrent ? '800' : '600', marginTop: 2 }}
+                    >
+                      {b.level}
+                    </NeonText>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={badgeTooltipStyles.prominentRow}>
+        <View style={[badgeTooltipStyles.badgeIconFrame, { borderColor: currentBadge.color + '55', backgroundColor: currentBadge.color + '18' }]}>
+          <NeonText style={{ fontSize: 30 }}>{currentBadge.icon}</NeonText>
+        </View>
+        <View style={badgeTooltipStyles.badgeTextCol}>
+          <NeonText variant="bodySm" color={currentBadge.color} glow={currentBadge.glowColor + '50'} style={{ fontWeight: '800' }}>
+            {currentBadge.name}
+          </NeonText>
+          <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 10 }}>
+            Nível {currentBadge.level} · {currentBadge.nameEN}
+          </NeonText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const badgeTooltipStyles = StyleSheet.create({
+  anchor: {
+    position: 'relative',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    zIndex: 20,
+    ...(Platform.OS === 'web' ? ({ cursor: 'help' } as any) : {}),
+  },
+  floatingPanel: {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    width: 292,
+    maxHeight: 268,
+    marginBottom: 10,
+    marginLeft: -146,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(10, 12, 20, 0.88)',
+    zIndex: 2000,
+    ...(Platform.OS === 'web' ? ({ overflow: 'hidden' } as any) : {}),
+  },
+  tooltipTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  tooltipScroll: {
+    maxHeight: 220,
+  },
+  tooltipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    justifyContent: 'center',
+    paddingBottom: 4,
+  },
+  tooltipCell: {
+    width: 30,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prominentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  badgeIconFrame: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 0 16px rgba(0,0,0,0.35)' } as any) : {}),
+  },
+  badgeTextCol: {
+    flex: 1,
+    minWidth: 0,
+    maxWidth: 220,
+  },
+});
 
 export default function ProfileScreen() {
   const { colors } = useA11y();
@@ -152,18 +315,20 @@ export default function ProfileScreen() {
   const maxWidth = isDesktop ? 640 : undefined;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.scrollContent, isDesktop && { alignItems: 'center' }]}
-      showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }, Platform.OS === 'web' ? ({ overflow: 'visible' } as const) : null]}
+      contentContainerStyle={[styles.scrollContent, isDesktop && { alignItems: 'center' }, Platform.OS === 'web' ? ({ overflow: 'visible' } as const) : null]}
+      showsVerticalScrollIndicator={false}
+    >
 
       {/* Profile Header */}
       <View style={[styles.header, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
-        <View style={{ alignItems: 'center', marginBottom: 8 }}>
-          <LogoMark size={36} color={Colors.primary} />
+        <View style={{ alignItems: 'center', marginBottom: 10 }}>
+          <LogoMark size={32} color={Colors.primary} />
         </View>
         <View style={styles.profileHeader}>
-          <View style={[styles.avatarLg, { borderColor: badge.color, shadowColor: badge.glowColor }]}>
-            <NeonText variant="h1" style={{ fontSize: 32 }}>{user.displayName.charAt(0).toUpperCase()}</NeonText>
+          <View style={[styles.avatarLg, { borderColor: badge.color, ...(Platform.OS === 'web' ? { boxShadow: `0 0 20px ${badge.glowColor}` } : { shadowColor: badge.glowColor }) } as any]}>
+            <NeonText variant="h1" style={{ fontSize: 34 }}>{user.displayName.charAt(0).toUpperCase()}</NeonText>
             {user.isGuardian && (
               <View style={[styles.guardianCrown, { backgroundColor: colors.background }]}>
                 <NeonText style={{ fontSize: 16 }}>🛡️</NeonText>
@@ -171,7 +336,7 @@ export default function ProfileScreen() {
             )}
           </View>
           <NeonText variant="h3" style={styles.displayName}>{user.displayName}</NeonText>
-          <BadgeIcon level={user.level} size="md" showName />
+          <ProfileBadgeWithTooltip reputation={user.reputation} />
         </View>
       </View>
 
@@ -237,7 +402,7 @@ export default function ProfileScreen() {
             <View style={[styles.progressBg, { backgroundColor: colors.glass.background }]}>
               <View style={[styles.progressFill, {
                 width: `${getProgressToNextLevel(user.reputation, badge) * 100}%`,
-                backgroundColor: badge.color, shadowColor: badge.glowColor,
+                backgroundColor: badge.color, ...(Platform.OS === 'web' ? { boxShadow: `0 0 8px ${badge.glowColor}` } : { shadowColor: badge.glowColor }),
               }]} />
             </View>
           </View>
@@ -437,8 +602,11 @@ const styles = StyleSheet.create({
     width: 88, height: 88, borderRadius: 44, borderWidth: 3,
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    shadowOpacity: 0.6, shadowRadius: 22, elevation: 8, marginBottom: Spacing.md,
+    marginBottom: Spacing.md,
     position: 'relative',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 0 22px rgba(0,0,0,0.6)' } as any
+      : { shadowOpacity: 0.6, shadowRadius: 22, elevation: 8 }),
   },
   guardianCrown: {
     position: 'absolute', bottom: -4, right: -4,
@@ -470,7 +638,12 @@ const styles = StyleSheet.create({
   },
   progressContainer: {},
   progressBg: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4, shadowOpacity: 0.6, shadowRadius: 6 },
+  progressFill: {
+    height: '100%', borderRadius: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 0 6px rgba(0,0,0,0.6)' } as any
+      : { shadowOpacity: 0.6, shadowRadius: 6 }),
+  },
 
   statsGrid: {
     flexDirection: 'row', paddingHorizontal: Spacing.xl,

@@ -202,7 +202,8 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
   return (
     <View style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000,
-    }} pointerEvents="box-none">
+      pointerEvents: 'box-none',
+    } as any}>
 
       <SpotlightBackdrop target={current.target} opacity={1} />
 

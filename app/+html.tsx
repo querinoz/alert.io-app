@@ -7,9 +7,12 @@ export default function Root({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#0D1117" />
         <meta name="background-color" content="#0D1117" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="description" content="Alert.io — From alert to action. Community safety platform with real-time incident reporting, monitoring, and family protection." />
 
         <link rel="preconnect" href="https://unpkg.com" />
@@ -38,6 +41,18 @@ export default function Root({ children }: PropsWithChildren) {
           * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+          }
+
+          @viewport { width: device-width; }
+
+          @supports (padding: env(safe-area-inset-top)) {
+            body {
+              padding-top: env(safe-area-inset-top);
+              padding-bottom: env(safe-area-inset-bottom);
+              padding-left: env(safe-area-inset-left);
+              padding-right: env(safe-area-inset-right);
+            }
           }
 
           button, [role="button"] {
@@ -80,6 +95,29 @@ export default function Root({ children }: PropsWithChildren) {
           @keyframes overlay-slide-in {
             from { opacity: 0; transform: translateY(12px) scale(0.97); }
             to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          @media (max-width: 600px) {
+            .maplibregl-popup-content {
+              max-width: 200px !important;
+              font-size: 10px !important;
+            }
+            .maplibregl-ctrl-group {
+              margin: 4px !important;
+            }
+            .maplibregl-ctrl-group button {
+              width: 32px !important;
+              height: 32px !important;
+            }
+            .attn-marker {
+              min-width: 24px !important;
+              min-height: 24px !important;
+            }
+            .pub-cam-marker {
+              width: 22px !important;
+              height: 22px !important;
+              font-size: 12px !important;
+            }
           }
 
           @media (prefers-reduced-motion: reduce) {

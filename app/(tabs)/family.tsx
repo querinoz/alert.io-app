@@ -24,7 +24,7 @@ const roleIcons: Record<string, string> = {
 };
 
 function MemberCard({ member, onLocate }: { member: FamilyMember; onLocate: () => void }) {
-  const { colors, minTarget } = useA11y();
+  const { colors } = useA11y();
   const haptics = useHaptics();
   const color = roleColors[member.role];
 

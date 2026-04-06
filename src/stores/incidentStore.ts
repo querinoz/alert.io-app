@@ -21,6 +21,7 @@ interface IncidentState {
   viewIncident: (incidentId: string) => void;
   addComment: (incidentId: string, text: string) => void;
   verifyIncident: (incidentId: string, guardianUid: string, guardianName: string) => void;
+  addIncidentDirect: (incident: Incident) => void;
   createIncident: (data: {
     category: IncidentCategory;
     severity: IncidentSeverity;
@@ -213,6 +214,13 @@ export const useIncidentStore = create<IncidentState>()((set, get) => ({
           ? { ...state.selectedIncident, isVerified: true, verifiedByUid: guardianUid, verifiedByName: guardianName }
           : state.selectedIncident,
     }));
+  },
+
+  addIncidentDirect: (incident) => {
+    set((state) => {
+      if (state.incidents.some((i) => i.id === incident.id)) return state;
+      return { incidents: [incident, ...state.incidents] };
+    });
   },
 
   createIncident: async (data) => {
