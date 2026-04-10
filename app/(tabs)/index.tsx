@@ -738,7 +738,7 @@ export default function MapScreen() {
       setPublicCameras(cams);
       setShowCameras(true);
     } catch {
-      setShowCameras(true);
+      setShowCameras(false);
     } finally {
       setCamerasLoading(false);
     }
