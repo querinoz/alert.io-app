@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, Linking, Animated, Image } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Platform, Pressable, Linking, Animated, TextInput, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
@@ -16,13 +16,26 @@ import { Spacing, Radius } from '../../src/theme/spacing';
 import { useLanguageStore, AVAILABLE_LANGUAGES } from '../../src/i18n';
 import { useAccessibilityStore } from '../../src/stores/accessibilityStore';
 
+function showToast(message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const t = document.createElement('div');
+    t.textContent = message;
+    t.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:#161B22;border:0.5px solid rgba(0,255,136,0.25);color:#00FF88;font-family:monospace;font-size:12px;padding:12px 24px;border-radius:8px;z-index:9999;opacity:0;transition:opacity .3s,transform .3s;';
+    document.body.appendChild(t);
+    requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+    setTimeout(() => { t.style.opacity = '0'; }, 2500);
+    setTimeout(() => { t.remove(); }, 3000);
+  }
+}
+
 function StatCard({ icon, label, value, color }: { icon: string; label: string; value: string | number; color: string }) {
   const { colors } = useA11y();
+  const MONO = Platform.OS === 'web' ? "'Courier New', monospace" : Platform.OS === 'ios' ? 'Courier' : 'monospace';
   return (
     <GlassCard style={styles.statCard} accessibilityLabel={`${label}: ${value}`}>
-      <MaterialCommunityIcons name={icon as any} size={22} color={color} />
-      <NeonText variant="h4" color={color} style={styles.statValue}>{value}</NeonText>
-      <NeonText variant="caption" color={colors.textTertiary}>{label}</NeonText>
+      <MaterialCommunityIcons name={icon as any} size={18} color={color} />
+      <NeonText variant="h4" color={color} style={[styles.statValue, { fontFamily: MONO, letterSpacing: 0.5 }]}>{value}</NeonText>
+      <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 10 }}>{label}</NeonText>
     </GlassCard>
   );
 }
@@ -41,7 +54,7 @@ function MenuRow({ icon, label, hint, onPress, color, danger, badge }: {
         transform: [{ scale: pressed ? 0.98 : 1 }],
       }]}
       accessible accessibilityLabel={label} accessibilityHint={hint} accessibilityRole="button">
-      <MaterialCommunityIcons name={icon as any} size={22}
+      <MaterialCommunityIcons name={icon as any} size={20}
         color={danger ? Colors.error : color ?? colors.textSecondary} />
       <NeonText variant="body" color={danger ? Colors.error : colors.textPrimary} style={styles.menuLabel}>
         {label}
@@ -51,7 +64,7 @@ function MenuRow({ icon, label, hint, onPress, color, danger, badge }: {
           <NeonText variant="caption" color={Colors.primary} style={{ fontWeight: '700', fontSize: 10 }}>{badge}</NeonText>
         </View>
       )}
-      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+      <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textTertiary} />
     </Pressable>
   );
 }
@@ -84,8 +97,8 @@ function EmergencyButton({ service }: { service: typeof EMERGENCY_SERVICES[numbe
       try { window.open(phoneUrl, '_self'); } catch { announce(`Call ${service.phone} for ${service.label}`); }
     } else {
       Linking.canOpenURL(phoneUrl).then((supported) => {
-        if (supported) { Linking.openURL(phoneUrl); }
-        else { announce(`Call ${service.phone} for ${service.label}`); }
+        if (supported) Linking.openURL(phoneUrl);
+        else announce(`Call ${service.phone} for ${service.label}`);
       });
     }
   };
@@ -111,7 +124,7 @@ function EmergencyButton({ service }: { service: typeof EMERGENCY_SERVICES[numbe
         accessibilityRole="button"
       >
         <View style={[styles.emergencyIconBg, { backgroundColor: service.color + '20' }]}>
-          <MaterialCommunityIcons name={service.icon as any} size={22} color={service.color} />
+          <MaterialCommunityIcons name={service.icon as any} size={18} color={service.color} />
         </View>
         <NeonText variant="caption" color={service.color} style={styles.emergencyLabel} numberOfLines={1}>
           {service.label}
@@ -124,173 +137,109 @@ function EmergencyButton({ service }: { service: typeof EMERGENCY_SERVICES[numbe
   );
 }
 
-function ProfileBadgeWithTooltip({ reputation }: { reputation: number }) {
+function LevelListModal({ reputation, visible, onClose }: { reputation: number; visible: boolean; onClose: () => void }) {
   const { colors } = useA11y();
-  const [hovered, setHovered] = useState(false);
-  const currentBadge = getBadgeForReputation(reputation);
   const isWeb = Platform.OS === 'web';
+  const currentBadge = getBadgeForReputation(reputation);
+  const currentIdx = BADGES.findIndex((b) => b.badgeId === currentBadge.badgeId);
+  const nextBadge = currentIdx < BADGES.length - 1 ? BADGES[currentIdx + 1] : null;
+  const ptsToNext = nextBadge ? nextBadge.minReputation - reputation : 0;
 
-  const webHoverHandlers = isWeb
-    ? ({
-        onMouseEnter: () => setHovered(true),
-        onMouseLeave: () => setHovered(false),
-      } as any)
-    : {};
-
-  const tooltipWebGlass = isWeb
-    ? ({
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
-        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset',
-        cursor: 'default',
-      } as any)
-    : {};
+  if (!visible) return null;
 
   return (
-    <View
-      style={badgeTooltipStyles.anchor}
-      {...webHoverHandlers}
-      accessibilityLabel={`Badge ${currentBadge.name}, nível ${currentBadge.level}`}
-    >
-      {isWeb && hovered && (
-        <View
-          style={[badgeTooltipStyles.floatingPanel, tooltipWebGlass]}
-          {...({
-            onMouseEnter: () => setHovered(true),
-            onMouseLeave: () => setHovered(false),
-          } as any)}
-        >
-          <NeonText variant="caption" color={colors.textTertiary} style={badgeTooltipStyles.tooltipTitle}>
-            Todos os níveis ({BADGES.length})
+    <View style={{
+      position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 9999, justifyContent: 'center', alignItems: 'center',
+      ...(isWeb ? { position: 'fixed' } as any : {}),
+    }}>
+      <Pressable
+        onPress={onClose}
+        style={{
+          position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          ...(isWeb ? { backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' } as any : {}),
+        }}
+      />
+      <View style={{
+        width: 360, maxWidth: '92%', maxHeight: '82%',
+        padding: Spacing.lg, borderRadius: 18, borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+        backgroundColor: 'rgba(10,12,22,0.96)',
+        zIndex: 10000,
+        ...(isWeb ? {
+          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05) inset',
+          animation: 'overlay-slide-in 0.25s ease-out',
+        } as any : {}),
+      }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md }}>
+          <NeonText variant="label" color={colors.textSecondary} style={{ fontSize: 11, letterSpacing: 1 }}>
+            PROGRESSÃO DE NÍVEL
           </NeonText>
-          <ScrollView
-            style={badgeTooltipStyles.tooltipScroll}
-            showsVerticalScrollIndicator={isWeb}
-            nestedScrollEnabled
-          >
-            <View style={badgeTooltipStyles.tooltipGrid}>
-              {BADGES.map((b) => {
-                const unlocked = reputation >= b.minReputation;
-                const isCurrent = b.badgeId === currentBadge.badgeId;
-                return (
-                  <View
-                    key={b.badgeId}
-                    style={[
-                      badgeTooltipStyles.tooltipCell,
-                      {
-                        opacity: unlocked ? 1 : 0.32,
-                        borderColor: isCurrent ? b.color + '70' : unlocked ? b.color + '28' : 'rgba(255,255,255,0.06)',
-                        backgroundColor: isCurrent ? b.color + '22' : unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.2)',
-                        ...(isWeb && isCurrent ? { boxShadow: `0 0 12px ${b.glowColor}44` } : {}),
-                      },
-                    ]}
-                  >
-                    <NeonText style={{ fontSize: isCurrent ? 18 : 14 }}>{b.icon}</NeonText>
-                    <NeonText
-                      variant="caption"
-                      color={isCurrent ? b.color : unlocked ? colors.textSecondary : colors.textTertiary}
-                      style={{ fontSize: 9, fontWeight: isCurrent ? '800' : '600', marginTop: 2 }}
-                    >
-                      {b.level}
-                    </NeonText>
+          <Pressable onPress={onClose} style={{
+            width: 28, height: 28, borderRadius: 8,
+            backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center',
+            ...(isWeb ? { cursor: 'pointer', transition: 'background 0.2s ease' } as any : {}),
+          }}>
+            <MaterialCommunityIcons name="close" size={16} color={colors.textTertiary} />
+          </Pressable>
+        </View>
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator nestedScrollEnabled>
+          {BADGES.map((b) => {
+            const unlocked = reputation >= b.minReputation;
+            const isCurrent = b.badgeId === currentBadge.badgeId;
+            return (
+              <View key={b.badgeId} style={{
+                flexDirection: 'row', alignItems: 'center', height: 38, gap: 8,
+                paddingHorizontal: 8, borderLeftWidth: 3, borderRadius: 6, marginBottom: 2,
+                opacity: unlocked ? 1 : 0.35,
+                backgroundColor: isCurrent ? b.color + '18' : 'transparent',
+                borderLeftColor: isCurrent ? b.color : 'transparent',
+                ...(isWeb && isCurrent ? { boxShadow: `inset 0 0 20px ${b.glowColor}15` } as any : {}),
+              }}>
+                <NeonText style={{ fontSize: 18, width: 24, textAlign: 'center' }}>
+                  {unlocked ? b.icon : '🔒'}
+                </NeonText>
+                <NeonText variant="caption" color={isCurrent ? b.color : colors.textTertiary}
+                  style={{ fontSize: 11, fontWeight: '800', width: 20, textAlign: 'center' }}>
+                  {b.level}
+                </NeonText>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <NeonText variant="caption" color={isCurrent ? b.color : unlocked ? colors.textPrimary : colors.textTertiary}
+                    style={{ fontSize: 12, fontWeight: isCurrent ? '800' : '500' }} numberOfLines={1}>
+                    {b.name}
+                  </NeonText>
+                  <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 9 }} numberOfLines={1}>
+                    {b.nameEN} · {b.minReputation.toLocaleString()} pts
+                  </NeonText>
+                </View>
+                {isCurrent && (
+                  <View style={{
+                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                    backgroundColor: b.color + '25', borderWidth: 1, borderColor: b.color + '40',
+                  }}>
+                    <NeonText variant="caption" color={b.color} style={{ fontSize: 7, fontWeight: '800', letterSpacing: 0.5 }}>ATUAL</NeonText>
                   </View>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
-      )}
-
-      <View style={badgeTooltipStyles.prominentRow}>
-        <View style={[badgeTooltipStyles.badgeIconFrame, { borderColor: currentBadge.color + '55', backgroundColor: currentBadge.color + '18' }]}>
-          <NeonText style={{ fontSize: 30 }}>{currentBadge.icon}</NeonText>
-        </View>
-        <View style={badgeTooltipStyles.badgeTextCol}>
-          <NeonText variant="bodySm" color={currentBadge.color} glow={currentBadge.glowColor + '50'} style={{ fontWeight: '800' }}>
-            {currentBadge.name}
-          </NeonText>
-          <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 10 }}>
-            Nível {currentBadge.level} · {currentBadge.nameEN}
-          </NeonText>
-        </View>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+        {nextBadge && (
+          <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: Spacing.sm, marginTop: Spacing.sm, alignItems: 'center' }}>
+            <NeonText variant="caption" color={nextBadge.color} style={{ fontSize: 11, fontWeight: '700' }}>
+              Próximo: {nextBadge.icon} {nextBadge.name} — faltam {ptsToNext.toLocaleString()} pts
+            </NeonText>
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
-const badgeTooltipStyles = StyleSheet.create({
-  anchor: {
-    position: 'relative',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    zIndex: 20,
-    ...(Platform.OS === 'web' ? ({ cursor: 'help' } as any) : {}),
-  },
-  floatingPanel: {
-    position: 'absolute',
-    bottom: '100%',
-    left: '50%',
-    width: 292,
-    maxHeight: 268,
-    marginBottom: 10,
-    marginLeft: -146,
-    padding: Spacing.md,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(10, 12, 20, 0.88)',
-    zIndex: 2000,
-    ...(Platform.OS === 'web' ? ({ overflow: 'hidden' } as any) : {}),
-  },
-  tooltipTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  tooltipScroll: {
-    maxHeight: 220,
-  },
-  tooltipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    justifyContent: 'center',
-    paddingBottom: 4,
-  },
-  tooltipCell: {
-    width: 30,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prominentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  badgeIconFrame: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...(Platform.OS === 'web' ? ({ boxShadow: '0 0 16px rgba(0,0,0,0.35)' } as any) : {}),
-  },
-  badgeTextCol: {
-    flex: 1,
-    minWidth: 0,
-    maxWidth: 220,
-  },
-});
-
 export default function ProfileScreen() {
-  const { colors } = useA11y();
+  const { colors, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const { isDesktop } = useResponsive();
   const { user, signOut } = useAuthStore();
@@ -298,6 +247,43 @@ export default function ProfileScreen() {
   const setLocale = useLanguageStore((s) => s.setLocale);
   const isLightTheme = useAccessibilityStore((s) => s.lightTheme);
   const setA11y = useAccessibilityStore((s) => s.set);
+
+  const [sosContact, setSosContact] = useState('Contato SOS — configurar');
+  const [showSosConfig, setShowSosConfig] = useState(false);
+  const [sosInput, setSosInput] = useState('');
+
+  const headerOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const headerSlide = useRef(new Animated.Value(reducedMotion ? 0 : -20)).current;
+  const contentOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const contentSlide = useRef(new Animated.Value(reducedMotion ? 0 : 24)).current;
+  const avatarScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.8)).current;
+  const avatarRingPulse = useRef(new Animated.Value(1)).current;
+  const repBarAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(headerOpacity, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(headerSlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 4 }),
+        Animated.spring(avatarScale, { toValue: 1, useNativeDriver: true, speed: 10, bounciness: 8 }),
+      ]),
+      Animated.parallel([
+        Animated.timing(contentOpacity, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(contentSlide, { toValue: 0, useNativeDriver: true, speed: 12, bounciness: 3 }),
+      ]),
+    ]).start();
+    Animated.timing(repBarAnim, { toValue: 1, duration: 1200, delay: 600, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+
+    const ringPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(avatarRingPulse, { toValue: 1.08, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(avatarRingPulse, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    ringPulse.start();
+    return () => ringPulse.stop();
+  }, [reducedMotion]);
 
   if (!user) {
     return (
@@ -313,131 +299,175 @@ export default function ProfileScreen() {
 
   const badge = getBadgeForReputation(user.reputation);
   const maxWidth = isDesktop ? 640 : undefined;
+  const mw = maxWidth ? { maxWidth, width: '100%' as const } : undefined;
+
+  const [showLevelList, setShowLevelList] = useState(false);
 
   return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }, Platform.OS === 'web' ? ({ overflow: 'visible' } as const) : null]}
-      contentContainerStyle={[styles.scrollContent, isDesktop && { alignItems: 'center' }, Platform.OS === 'web' ? ({ overflow: 'visible' } as const) : null]}
+      style={{ flex: 1 }}
+      contentContainerStyle={[styles.scrollContent, isDesktop && { alignItems: 'center' }]}
       showsVerticalScrollIndicator={false}
     >
-
-      {/* Profile Header */}
-      <View style={[styles.header, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
-        <View style={{ alignItems: 'center', marginBottom: 10 }}>
-          <LogoMark size={32} color={Colors.primary} />
+      {/* 1 — Header */}
+      <Animated.View style={[styles.header, mw, { opacity: headerOpacity, transform: [{ translateY: headerSlide }] }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+          <LogoMark size={22} color={Colors.primary} />
         </View>
-        <View style={styles.profileHeader}>
-          <View style={[styles.avatarLg, { borderColor: badge.color, ...(Platform.OS === 'web' ? { boxShadow: `0 0 20px ${badge.glowColor}` } : { shadowColor: badge.glowColor }) } as any]}>
-            <NeonText variant="h1" style={{ fontSize: 34 }}>{user.displayName.charAt(0).toUpperCase()}</NeonText>
+        <View style={styles.profileRow}>
+          <Animated.View style={[styles.avatar, { borderColor: badge.color, transform: [{ scale: Animated.multiply(avatarScale, avatarRingPulse) }], ...(Platform.OS === 'web' ? { boxShadow: `0 0 20px ${badge.glowColor}`, transition: 'box-shadow 0.4s ease' } : { shadowColor: badge.glowColor }) } as any]}>
+            <NeonText variant="h2" style={{ fontSize: 28 }}>{user.displayName.charAt(0).toUpperCase()}</NeonText>
             {user.isGuardian && (
-              <View style={[styles.guardianCrown, { backgroundColor: colors.background }]}>
-                <NeonText style={{ fontSize: 16 }}>🛡️</NeonText>
+              <View style={[styles.guardianPip, { backgroundColor: colors.background }]}>
+                <NeonText style={{ fontSize: 12 }}>🛡️</NeonText>
               </View>
             )}
+          </Animated.View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <NeonText variant="h3" numberOfLines={1}>{user.displayName}</NeonText>
+            <Pressable
+              onPress={() => { haptics.light(); setShowLevelList(true); }}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4,
+                opacity: pressed ? 0.7 : 1,
+                ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'opacity 0.15s ease' } as any : {}),
+              })}
+              accessibilityLabel={`Nível ${badge.level}: ${badge.name}. Toque para ver todos.`}
+              accessibilityRole="button"
+            >
+              <NeonText style={{ fontSize: 16 }}>{badge.icon}</NeonText>
+              <NeonText variant="bodySm" color={badge.color} glow={badge.glowColor + '50'} style={{ fontWeight: '800' }}>
+                {badge.name}
+              </NeonText>
+              <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 10 }}>
+                Nv.{badge.level}
+              </NeonText>
+              <MaterialCommunityIcons name="chevron-right" size={14} color={colors.textTertiary} />
+            </Pressable>
           </View>
-          <NeonText variant="h3" style={styles.displayName}>{user.displayName}</NeonText>
-          <ProfileBadgeWithTooltip reputation={user.reputation} />
         </View>
-      </View>
+      </Animated.View>
 
-      {/* Guardian banner */}
-      {user.isGuardian && (
-        <GlassCard
-          style={[styles.guardianBanner, maxWidth ? { maxWidth, width: '100%' } : undefined]}
-          glowColor={Colors.primary + '30'}
-          accessibilityLabel="Nível Guardião. Você tem poderes completos de moderação."
-        >
-          <View style={styles.guardianBannerRow}>
-            <View style={styles.guardianBadge}>
-              <NeonText style={{ fontSize: 28 }}>🛡️</NeonText>
-            </View>
-            <View style={styles.guardianBannerText}>
-              <NeonText variant="h4" color={Colors.primary} glow={Colors.primary + '60'}>
-                GUARDIAN
-              </NeonText>
-              <NeonText variant="caption" color={colors.textSecondary}>
-                Poderes completos de moderação desbloqueados
-              </NeonText>
-            </View>
-            <View style={styles.guardianLevel}>
-              <NeonText variant="caption" color={colors.textTertiary}>Tier</NeonText>
-              <NeonText variant="h3" color={Colors.primary} glow={Colors.primary + '60'}>
-                ∞
-              </NeonText>
-            </View>
-          </View>
-
-          <View style={styles.guardianPowers}>
-            {[
-              { icon: 'check-decagram', label: 'Verificar Incidentes', count: user.verifiedIncidents },
-              { icon: 'delete-circle', label: 'Remover Falsos', count: user.removedIncidents },
-              { icon: 'account-supervisor', label: 'Mentorados', count: user.mentees },
-            ].map((power) => (
-              <View key={power.label} style={styles.powerItem}>
-                <MaterialCommunityIcons name={power.icon as any} size={16} color={Colors.primary} />
-                <NeonText variant="caption" color={colors.textSecondary}>{power.label}</NeonText>
-                <NeonText variant="bodySm" color={Colors.primary} style={{ fontWeight: '700' }}>
-                  {power.count?.toLocaleString() ?? 0}
-                </NeonText>
-              </View>
-            ))}
-          </View>
-        </GlassCard>
-      )}
-
-      {/* Reputation card */}
-      <GlassCard
-        style={[styles.repCard, maxWidth ? { maxWidth, width: '100%' } : undefined]}
-        glowColor={badge.glowColor + '30'}
-        accessibilityLabel={`Reputation: ${user.reputation.toLocaleString()} points. ${badge.nameEN}.`}
-      >
+      {/* 2 — Reputation + Progress */}
+      <Animated.View style={{ opacity: contentOpacity, transform: [{ translateY: contentSlide }] }}>
+      <GlassCard style={[styles.repCard, mw]} glowColor={badge.glowColor + '30'}
+        accessibilityLabel={`Reputação: ${user.reputation.toLocaleString()} pontos. ${badge.nameEN}.`}>
         <View style={styles.repRow}>
           <NeonText variant="label" color={colors.textSecondary}>Reputação</NeonText>
           <NeonText variant="h3" color={badge.color} glow={badge.glowColor}>
             {user.reputation.toLocaleString()}
           </NeonText>
         </View>
-        {!user.isGuardian && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBg, { backgroundColor: colors.glass.background }]}>
-              <View style={[styles.progressFill, {
-                width: `${getProgressToNextLevel(user.reputation, badge) * 100}%`,
-                backgroundColor: badge.color, ...(Platform.OS === 'web' ? { boxShadow: `0 0 8px ${badge.glowColor}` } : { shadowColor: badge.glowColor }),
-              }]} />
-            </View>
-          </View>
-        )}
-        {user.isGuardian && (
-          <View style={[styles.progressBg, { backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', height: 24, borderRadius: Radius.sm }]}>
-            <NeonText variant="caption" color={Colors.primary} style={{ fontWeight: '700' }}>
-              MAX LEVEL — UNLIMITED
+        {user.isGuardian ? (
+          <View style={[styles.progressBg, { backgroundColor: Colors.primary + '15', justifyContent: 'center', alignItems: 'center', height: 22, borderRadius: Radius.sm }]}>
+            <NeonText variant="caption" color={Colors.primary} style={{ fontWeight: '700', fontSize: 10 }}>
+              NÍVEL MÁXIMO
             </NeonText>
+          </View>
+        ) : (
+          <View style={[styles.progressBg, { backgroundColor: colors.glass.background }]}>
+            <Animated.View style={[styles.progressFill, {
+              width: repBarAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${getProgressToNextLevel(user.reputation, badge) * 100}%`] }),
+              backgroundColor: badge.color,
+              ...(Platform.OS === 'web' ? { boxShadow: `0 0 8px ${badge.glowColor}` } : { shadowColor: badge.glowColor }),
+            }]} />
           </View>
         )}
       </GlassCard>
 
-      {/* Stats grid */}
-      <View style={[styles.statsGrid, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
+      {/* 3 — Stats Grid */}
+      <View style={[styles.statsGrid, mw]}>
         <StatCard icon="file-document-edit" label="Relatórios" value={user.totalReports.toLocaleString()} color={Colors.primary} />
         <StatCard icon="check-circle" label="Confirmações" value={user.totalConfirmations.toLocaleString()} color={Colors.success} />
         <StatCard icon="calendar-today" label="Hoje"
           value={user.dailyReportLimit === -1 ? `${user.reportsToday}/∞` : `${user.reportsToday}/${user.dailyReportLimit}`}
           color={Colors.warning} />
       </View>
-
       {user.isGuardian && (
-        <View style={[styles.statsGrid, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
+        <View style={[styles.statsGrid, mw]}>
           <StatCard icon="check-decagram" label="Verificados" value={user.verifiedIncidents ?? 0} color={Colors.primary} />
           <StatCard icon="delete-circle" label="Removidos" value={user.removedIncidents ?? 0} color={Colors.error} />
           <StatCard icon="account-supervisor" label="Mentorados" value={user.mentees ?? 0} color={Colors.secondary} />
         </View>
       )}
 
-      {/* Emergency Services */}
-      <View style={[styles.emergencySection, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
+      {/* 4 — SOS & Pânico */}
+      <View style={[styles.sosSection, mw]}>
+        <View style={styles.sosRow}>
+          <Pressable
+            onPress={() => {
+              haptics.heavy();
+              showToast('🚨 Alerta enviado ao grupo familiar!');
+              announce('Alerta enviado ao grupo familiar');
+            }}
+            style={({ pressed }) => [styles.sosBtn, {
+              backgroundColor: pressed ? '#FF2D5520' : '#FF2D5510',
+              borderColor: '#FF2D5540',
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            }]}
+            accessible accessibilityLabel="Alerta Família" accessibilityRole="button"
+          >
+            <NeonText style={{ fontSize: 20 }}>🚨</NeonText>
+            <NeonText variant="bodySm" color="#FF2D55" style={{ fontWeight: '800', fontSize: 12 }}>
+              Alerta Família
+            </NeonText>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              haptics.heavy();
+              showToast(`🆘 SOS enviado para ${sosContact}`);
+              announce(`SOS enviado para ${sosContact}`);
+            }}
+            style={({ pressed }) => [styles.sosBtn, {
+              backgroundColor: pressed ? '#FF950020' : '#FF950010',
+              borderColor: '#FF950040',
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            }]}
+            accessible accessibilityLabel="S.O.S." accessibilityRole="button"
+          >
+            <NeonText style={{ fontSize: 20 }}>🆘</NeonText>
+            <NeonText variant="bodySm" color="#FF9500" style={{ fontWeight: '800', fontSize: 12 }}>
+              S.O.S.
+            </NeonText>
+          </Pressable>
+        </View>
+        <Pressable onPress={() => setShowSosConfig(!showSosConfig)}>
+          <NeonText variant="caption" color={colors.textTertiary} style={styles.sosConfigLink}>
+            {sosContact} · Configurar
+          </NeonText>
+        </Pressable>
+        {showSosConfig && (
+          <View style={styles.sosConfigRow}>
+            <TextInput
+              value={sosInput}
+              onChangeText={setSosInput}
+              placeholder="Nome ou número do contato"
+              placeholderTextColor={colors.textTertiary}
+              style={[styles.sosInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: 'rgba(255,255,255,0.04)' }]}
+            />
+            <Pressable
+              onPress={() => {
+                if (sosInput.trim()) {
+                  setSosContact(sosInput.trim());
+                  setShowSosConfig(false);
+                  setSosInput('');
+                  showToast('✅ Contato SOS atualizado');
+                }
+              }}
+              style={[styles.sosSaveBtn, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary + '40' }]}
+            >
+              <NeonText variant="caption" color={Colors.primary} style={{ fontWeight: '700' }}>Salvar</NeonText>
+            </Pressable>
+          </View>
+        )}
+      </View>
+
+      {/* 5 — Emergência */}
+      <View style={[styles.emergencySection, mw]}>
         <View style={styles.emergencySectionHeader}>
-          <MaterialCommunityIcons name="phone-alert" size={18} color={Colors.error} />
-          <NeonText variant="label" color={Colors.error} style={{ marginLeft: Spacing.sm }}>
+          <MaterialCommunityIcons name="phone-alert" size={16} color={Colors.error} />
+          <NeonText variant="label" color={Colors.error} style={{ marginLeft: Spacing.xs, fontSize: 11 }}>
             Serviços de Emergência
           </NeonText>
         </View>
@@ -448,15 +478,12 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Theme & Language */}
-      <View style={[styles.settingsSection, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
-        {/* Theme Toggle */}
+      {/* 6 — Preferências */}
+      <View style={[styles.settingsSection, mw]}>
         <View style={styles.settingRow}>
           <View style={styles.settingLabelRow}>
-            <MaterialCommunityIcons name="theme-light-dark" size={18} color={colors.textSecondary} />
-            <NeonText variant="bodySm" color={colors.textPrimary} style={{ marginLeft: Spacing.sm }}>
-              Tema
-            </NeonText>
+            <MaterialCommunityIcons name="theme-light-dark" size={16} color={colors.textSecondary} />
+            <NeonText variant="bodySm" color={colors.textPrimary} style={{ marginLeft: Spacing.xs }}>Tema</NeonText>
           </View>
           <View style={styles.themeToggle}>
             <Pressable
@@ -467,7 +494,7 @@ export default function ProfileScreen() {
                 transform: [{ scale: pressed ? 0.92 : 1 }],
               }]}
             >
-              <MaterialCommunityIcons name="weather-night" size={16} color={!isLightTheme ? colors.primary : colors.textTertiary} />
+              <MaterialCommunityIcons name="weather-night" size={14} color={!isLightTheme ? colors.primary : colors.textTertiary} />
               <NeonText variant="caption" color={!isLightTheme ? colors.primary : colors.textTertiary}> Escuro</NeonText>
             </Pressable>
             <Pressable
@@ -478,19 +505,15 @@ export default function ProfileScreen() {
                 transform: [{ scale: pressed ? 0.92 : 1 }],
               }]}
             >
-              <MaterialCommunityIcons name="white-balance-sunny" size={16} color={isLightTheme ? colors.primary : colors.textTertiary} />
+              <MaterialCommunityIcons name="white-balance-sunny" size={14} color={isLightTheme ? colors.primary : colors.textTertiary} />
               <NeonText variant="caption" color={isLightTheme ? colors.primary : colors.textTertiary}> Claro</NeonText>
             </Pressable>
           </View>
         </View>
-
-        {/* Language Selector */}
         <View style={styles.settingRow}>
           <View style={styles.settingLabelRow}>
-            <MaterialCommunityIcons name="translate" size={18} color={colors.textSecondary} />
-            <NeonText variant="bodySm" color={colors.textPrimary} style={{ marginLeft: Spacing.sm }}>
-              Idioma
-            </NeonText>
+            <MaterialCommunityIcons name="translate" size={16} color={colors.textSecondary} />
+            <NeonText variant="bodySm" color={colors.textPrimary} style={{ marginLeft: Spacing.xs }}>Idioma</NeonText>
           </View>
           <View style={styles.langRow}>
             {AVAILABLE_LANGUAGES.map((lang) => {
@@ -498,7 +521,7 @@ export default function ProfileScreen() {
               return (
                 <Pressable
                   key={lang.code}
-                  onPress={() => { haptics.selection(); setLocale(lang.code); announce(`Language changed to ${lang.name}`); }}
+                  onPress={() => { haptics.selection(); setLocale(lang.code); announce(`Idioma alterado para ${lang.name}`); }}
                   style={({ pressed }) => [styles.langChip, {
                     backgroundColor: isActive ? colors.primary + '20' : 'transparent',
                     borderColor: isActive ? colors.primary : colors.border,
@@ -515,77 +538,46 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* QR Codes - Download on Mobile */}
-      <GlassCard style={[styles.qrSection, maxWidth ? { maxWidth, width: '100%' } : undefined]}
-        accessibilityLabel="Escaneie QR codes para baixar Alert.io no iOS ou Android">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md }}>
-          <MaterialCommunityIcons name="qrcode-scan" size={16} color={colors.primary} />
-          <NeonText variant="label" color={colors.primary}>Baixe o App</NeonText>
-        </View>
-        <View style={styles.qrDualRow}>
-          {/* iOS QR */}
-          <View style={styles.qrCard}>
-            <View style={[styles.qrBg, { backgroundColor: '#fff' }]}>
-              <Image
-                source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://apps.apple.com/app/alert-io/id0000000000&bgcolor=ffffff&color=0d1117' }}
-                style={{ width: 90, height: 90 }}
-                accessibilityLabel="QR code para baixar Alert.io na App Store"
-              />
-            </View>
-            <View style={[styles.storeBadgeLg, { borderColor: colors.border, backgroundColor: colors.glass.background }]}>
-              <MaterialCommunityIcons name="apple" size={16} color={colors.textPrimary} />
-              <View style={{ marginLeft: 6 }}>
-                <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 8, lineHeight: 10 }}>Download on the</NeonText>
-                <NeonText variant="caption" color={colors.textPrimary} style={{ fontSize: 11, fontWeight: '700', lineHeight: 14 }}>App Store</NeonText>
-              </View>
-            </View>
-          </View>
-
-          {/* Android QR */}
-          <View style={styles.qrCard}>
-            <View style={[styles.qrBg, { backgroundColor: '#fff' }]}>
-              <Image
-                source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://play.google.com/store/apps/details?id=io.alert.community&bgcolor=ffffff&color=0d1117' }}
-                style={{ width: 90, height: 90 }}
-                accessibilityLabel="QR code para baixar Alert.io no Google Play"
-              />
-            </View>
-            <View style={[styles.storeBadgeLg, { borderColor: colors.border, backgroundColor: colors.glass.background }]}>
-              <MaterialCommunityIcons name="google-play" size={16} color="#3DDC84" />
-              <View style={{ marginLeft: 6 }}>
-                <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 8, lineHeight: 10 }}>Get it on</NeonText>
-                <NeonText variant="caption" color={colors.textPrimary} style={{ fontSize: 11, fontWeight: '700', lineHeight: 14 }}>Google Play</NeonText>
-              </View>
-            </View>
-          </View>
-        </View>
-      </GlassCard>
-
-      {/* Menu items */}
-      <GlassCard noPadding style={[styles.menuCard, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
+      {/* 7 — Menu */}
+      <GlassCard noPadding style={[styles.menuCard, mw]}>
         <MenuRow icon="cog" label="Configurações" hint="Abrir configurações" onPress={() => router.push('/settings')} />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <MenuRow icon="human-accessible" label="Acessibilidade"
           hint="Configurar opções de acessibilidade" color={Colors.secondary}
           onPress={() => router.push('/settings/accessibility')} />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <MenuRow icon="eye-off" label={user.isGhostMode ? 'Modo Fantasma (ON)' : 'Modo Fantasma'}
-          hint="Alternar visibilidade no mapa público"
-          badge={user.isGhostMode ? 'ON' : undefined}
+        <MenuRow icon={user.isGhostMode ? 'eye-off' : 'eye'} label="Modo Fantasma"
+          hint={user.isGhostMode ? 'Atualmente invisível no mapa' : 'Alternar visibilidade no mapa público'}
+          badge={user.isGhostMode ? 'ATIVO' : undefined}
+          color={user.isGhostMode ? '#00AAFF' : undefined}
           onPress={() => {
             haptics.medium();
-            useAuthStore.getState().updateProfile({ isGhostMode: !user.isGhostMode });
-            announce(user.isGhostMode ? 'Modo fantasma desativado.' : 'Modo fantasma ativado.');
+            const newVal = !user.isGhostMode;
+            useAuthStore.getState().updateProfile({ isGhostMode: newVal });
+            showToast(newVal ? '👻 Modo Fantasma ativado — você está invisível' : '👁 Modo Fantasma desativado — visível no mapa');
+            announce(newVal ? 'Modo fantasma ativado' : 'Modo fantasma desativado');
           }} />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <MenuRow icon="share-variant" label="Compartilhar Localização"
           hint="Criar link temporário de compartilhamento"
-          onPress={() => { haptics.light(); announce('Link de localização criado'); }} />
+          onPress={() => {
+            haptics.light();
+            const shareUrl = `https://alert.io/loc/${user.uid.slice(0, 8)}?t=${Date.now()}`;
+            if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast('📋 Link copiado! Válido por 30 minutos.');
+              });
+            }
+            announce('Link de localização copiado para a área de transferência');
+          }} />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <MenuRow icon="logout" label="Sair" hint="Sair da sua conta" danger
           onPress={() => { signOut(); router.replace('/(auth)/sign-in'); }} />
       </GlassCard>
+      </Animated.View>
     </ScrollView>
+    <LevelListModal reputation={user.reputation} visible={showLevelList} onClose={() => setShowLevelList(false)} />
+    </View>
   );
 }
 
@@ -593,110 +585,166 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingBottom: Spacing['6xl'] },
+
   header: {
-    paddingTop: Platform.OS === 'web' ? 24 : Platform.OS === 'ios' ? 64 : 44,
-    paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg,
+    paddingTop: Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 56 : 40,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
-  profileHeader: { alignItems: 'center' },
-  avatarLg: {
-    width: 88, height: 88, borderRadius: 44, borderWidth: 3,
-    justifyContent: 'center', alignItems: 'center',
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2.5,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    marginBottom: Spacing.md,
     position: 'relative',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 0 22px rgba(0,0,0,0.6)' } as any
-      : { shadowOpacity: 0.6, shadowRadius: 22, elevation: 8 }),
+      ? { boxShadow: '0 0 18px rgba(0,0,0,0.5)' } as any
+      : { shadowOpacity: 0.5, shadowRadius: 18, elevation: 6 }),
   },
-  guardianCrown: {
-    position: 'absolute', bottom: -4, right: -4,
-    width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: Colors.primary,
+  guardianPip: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.primary,
   },
-  displayName: { marginBottom: Spacing.sm },
 
-  guardianBanner: {
-    marginHorizontal: Spacing.xl, marginBottom: Spacing.lg, padding: Spacing.xl,
-    borderWidth: 1, borderColor: Colors.primary + '30',
+  repCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
   },
-  guardianBannerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.lg },
-  guardianBadge: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: Colors.primary + '15', borderWidth: 2, borderColor: Colors.primary + '40',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  guardianBannerText: { flex: 1, marginLeft: Spacing.md },
-  guardianLevel: { alignItems: 'center' },
-  guardianPowers: { flexDirection: 'row', justifyContent: 'space-around' },
-  powerItem: { alignItems: 'center', gap: 4 },
-
-  repCard: { marginHorizontal: Spacing.xl, marginBottom: Spacing.lg, padding: Spacing.xl },
   repRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: Spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
-  progressContainer: {},
-  progressBg: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: {
-    height: '100%', borderRadius: 4,
+    height: '100%',
+    borderRadius: 3,
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 0 6px rgba(0,0,0,0.6)' } as any
       : { shadowOpacity: 0.6, shadowRadius: 6 }),
   },
 
   statsGrid: {
-    flexDirection: 'row', paddingHorizontal: Spacing.xl,
-    gap: Spacing.md, marginBottom: Spacing.lg,
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  statCard: { flex: 1, alignItems: 'center', padding: Spacing.lg },
-  statValue: { marginTop: Spacing.xs, marginBottom: 2 },
+  statCard: { flex: 1, alignItems: 'center', padding: Spacing.md },
+  statValue: { marginTop: 2, marginBottom: 1, fontSize: 16 },
+
+  sosSection: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  sosRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  sosBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease', cursor: 'pointer' } as any : {}),
+  },
+  sosConfigLink: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    textDecorationLine: 'underline',
+  },
+  sosConfigRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    alignItems: 'center',
+  },
+  sosInput: {
+    flex: 1,
+    height: 34,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  sosSaveBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 7,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+  },
 
   emergencySection: {
-    paddingHorizontal: Spacing.xl,
-    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   emergencySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   emergencyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   emergencyBtnWrapper: {
     width: '31%',
-    minWidth: 95,
+    minWidth: 90,
     flexGrow: 1,
   },
   emergencyBtn: {
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: 4,
+    borderRadius: Radius.md,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { transition: 'all 0.25s cubic-bezier(0.25,0.8,0.25,1)', cursor: 'pointer' } as any : {}),
   },
   emergencyIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    marginBottom: 2,
   },
   emergencyLabel: {
     fontWeight: '700',
-    fontSize: 11,
-    marginBottom: 2,
+    fontSize: 10,
+    marginBottom: 1,
   },
 
   settingsSection: {
-    paddingHorizontal: Spacing.xl,
-    marginBottom: Spacing.lg,
-    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
   },
   settingRow: {
     flexDirection: 'row',
@@ -709,13 +757,13 @@ const styles = StyleSheet.create({
   },
   themeToggle: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   themeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
     borderRadius: Radius.full,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { transition: 'all 0.25s ease', cursor: 'pointer' } as any : {}),
@@ -726,50 +774,28 @@ const styles = StyleSheet.create({
   },
   langChip: {
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: Radius.full,
     borderWidth: 1,
-    minWidth: 36,
+    minWidth: 34,
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease', cursor: 'pointer' } as any : {}),
   },
-  qrSection: {
-    marginHorizontal: Spacing.xl,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-  },
-  qrDualRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.xl,
-    flexWrap: 'wrap',
-  },
-  qrCard: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  qrBg: {
-    padding: 6,
-    borderRadius: Radius.md,
-  },
-  storeBadgeLg: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-  },
-  menuCard: { marginHorizontal: Spacing.xl },
+
+  menuCard: { marginHorizontal: Spacing.lg, marginBottom: Spacing.lg },
   menuRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: Spacing.lg, paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease', cursor: 'pointer' } as any : {}),
   },
   menuLabel: { flex: 1, marginLeft: Spacing.md },
   menuBadge: {
-    paddingHorizontal: Spacing.sm, paddingVertical: 2,
-    borderRadius: Radius.sm, marginRight: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    marginRight: Spacing.sm,
   },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: Spacing['4xl'] },
 });

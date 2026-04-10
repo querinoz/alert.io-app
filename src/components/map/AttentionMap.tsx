@@ -10,6 +10,7 @@ import { getCategoryMeta } from '../../constants/categories';
 import { WORLD_CAPITALS } from '../../data/worldCapitals';
 import { WORLD_POIS, POI_META } from '../../data/worldPOIs';
 import { MOCK_USER_PROFILES, type UserProfileCard } from '../../services/mockData';
+import { useAccessibilityStore } from '../../stores/accessibilityStore';
 
 function PulsingMarker({ marker, isSelected, onPress, dimmed }: {
   marker: MapMarker;
@@ -21,8 +22,10 @@ function PulsingMarker({ marker, isSelected, onPress, dimmed }: {
   const catColor = Colors.category[marker.incident.category];
   const catMeta = getCategoryMeta(marker.incident.category);
   const sevColor = Colors.severity[marker.incident.severity];
+  const reducedMotion = useAccessibilityStore((s) => s.reducedMotion);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -41,7 +44,7 @@ function PulsingMarker({ marker, isSelected, onPress, dimmed }: {
     );
     anim.start();
     return () => anim.stop();
-  }, [isSelected]);
+  }, [isSelected, reducedMotion]);
 
   return (
     <Marker
@@ -86,8 +89,10 @@ function PulsingMarker({ marker, isSelected, onPress, dimmed }: {
 
 function UserLocationMarker({ coordinate }: { coordinate: { latitude: number; longitude: number } }) {
   const ring = useRef(new Animated.Value(1)).current;
+  const reducedMotion = useAccessibilityStore((s) => s.reducedMotion);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(ring, { toValue: 1.8, duration: 1500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
@@ -96,7 +101,7 @@ function UserLocationMarker({ coordinate }: { coordinate: { latitude: number; lo
     );
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, [reducedMotion]);
 
   const opacity = ring.interpolate({
     inputRange: [1, 1.8],

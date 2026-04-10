@@ -74,6 +74,9 @@ function injectMapStyles() {
     @keyframes marker-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
     @keyframes user-glow-pulse { 0%,100% { transform: scale(1); opacity:0.5; } 50% { transform: scale(1.6); opacity:0; } }
     @keyframes scan-pulse { 0% { transform: scale(0.3); opacity:0.5; } 100% { transform: scale(1); opacity:0; } }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+    }
     .attn-marker { cursor: pointer; transition: opacity 0.2s ease, visibility 0.15s ease; transform-origin: center center; overflow: visible; }
     .attn-marker:hover { z-index: 500 !important; }
     .attn-marker.selected { z-index: 90 !important; }
@@ -85,6 +88,7 @@ function injectMapStyles() {
     .user-glow-ring { animation: user-glow-pulse 2.5s ease-out infinite; }
     .scan-pulse-ring { animation: scan-pulse 2s ease-out infinite; }
 
+    .maplibregl-popup { z-index: 1000 !important; }
     .maplibregl-popup-content {
       background: rgba(20,20,32,0.95) !important; border-radius: 14px !important;
       padding: 0 !important; border: 1px solid rgba(255,255,255,0.08) !important;
@@ -602,9 +606,10 @@ export function AttentionMap({
           'fill-extrusion-height': ['get', 'render_height'],
           'fill-extrusion-opacity': [
             'interpolate', ['linear'], ['zoom'],
-            13, 0.3,
-            15, 0.75,
-            18, 0.85,
+            13, 0.5,
+            15, 0.8,
+            17, 0.9,
+            20, 0.95,
           ],
           'fill-extrusion-vertical-gradient': true,
         },
@@ -616,15 +621,22 @@ export function AttentionMap({
           type: 'fill-extrusion',
           source: 'openmaptiles',
           'source-layer': 'building',
-          minzoom: 15,
+          minzoom: 14,
           paint: {
             'fill-extrusion-base': ['get', 'render_min_height'],
             'fill-extrusion-color': edgeColor,
             'fill-extrusion-height': ['+', ['get', 'render_height'], 0.3],
-            'fill-extrusion-opacity': 0.15,
+            'fill-extrusion-opacity': [
+              'interpolate', ['linear'], ['zoom'],
+              14, 0.08,
+              16, 0.15,
+              18, 0.2,
+            ],
           },
         });
       }
+
+      try { map.setMaxPitch(85); } catch (_) {}
     } catch (_) { /* source not available yet */ }
   }
 
@@ -757,7 +769,7 @@ export function AttentionMap({
     });
   }, [focusLocation]);
 
-  // Incident markers
+  // Incident markers — create/remove only when markers list or driveMode changes
   useEffect(() => {
     const map = glMap.current;
     if (!map) return;
@@ -768,8 +780,7 @@ export function AttentionMap({
     if (hoverPopupRef.current) { hoverPopupRef.current.remove(); hoverPopupRef.current = null; }
 
     markers.forEach((m) => {
-      const isSelected = m.id === selectedMarkerId;
-      const el = createMarkerEl(m, isSelected);
+      const el = createMarkerEl(m, false);
 
       if (driveMode && userLocation) {
         const dlat = m.coordinate.latitude - userLocation.latitude;
@@ -811,20 +822,44 @@ export function AttentionMap({
         popupRef.current = popup;
       });
 
-      if (isSelected) {
-        const popup = new maplibregl.Popup({ offset: 25, maxWidth: '320px', closeOnClick: true })
-          .setHTML(createPopupHTML(m))
-          .setLngLat([m.coordinate.longitude, m.coordinate.latitude])
-          .addTo(map);
-        popupRef.current = popup;
-      }
-
       (marker as any)._incidentId = m.id;
       markersRef.current.push(marker);
     });
 
     declutterIncidentMarkers();
-  }, [markers, selectedMarkerId, driveMode]);
+  }, [markers, driveMode]);
+
+  // Handle selectedMarkerId changes — update marker appearance + show popup without recreating
+  useEffect(() => {
+    const map = glMap.current;
+    if (!map) return;
+
+    markersRef.current.forEach((m: any) => {
+      const el = m.getElement();
+      if (!el) return;
+      const id = m._incidentId;
+      if (id === selectedMarkerId) {
+        el.classList.add('selected');
+        el.style.zIndex = '90';
+      } else {
+        el.classList.remove('selected');
+        el.style.zIndex = '';
+      }
+    });
+
+    if (popupRef.current) { popupRef.current.remove(); popupRef.current = null; }
+
+    if (selectedMarkerId) {
+      const found = markers.find(mk => mk.id === selectedMarkerId);
+      if (found) {
+        const popup = new maplibregl.Popup({ offset: 25, maxWidth: '320px', closeOnClick: true })
+          .setHTML(createPopupHTML(found))
+          .setLngLat([found.coordinate.longitude, found.coordinate.latitude])
+          .addTo(map);
+        popupRef.current = popup;
+      }
+    }
+  }, [selectedMarkerId]);
 
   // Highlight marker on hover from sidebar nearby list — glow only, no movement
   useEffect(() => {

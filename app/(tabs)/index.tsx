@@ -8,7 +8,7 @@ import { NeonText } from '../../src/components/ui/NeonText';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { BadgeIcon } from '../../src/components/ui/BadgeIcon';
 import { LoadingRadar } from '../../src/components/ui/LoadingRadar';
-import { IncidentCard } from '../../src/components/incident/IncidentCard';
+
 import { useA11y, announce } from '../../src/hooks/useAccessibility';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { useResponsive } from '../../src/hooks/useResponsive';
@@ -268,15 +268,6 @@ function MapFab({ icon, color, label, onPress, active, style }: {
   icon: string; color: string; label: string; onPress: () => void; active?: boolean; style?: any;
 }) {
   const [hovered, setHovered] = useState(false);
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(glowAnim, {
-      toValue: hovered ? 1 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [hovered]);
 
   return (
     <View style={[fabStyles.wrapper, style]}>
@@ -298,6 +289,10 @@ function MapFab({ icon, color, label, onPress, active, style }: {
           shadowRadius: active ? 16 : hovered ? 12 : 0,
           shadowOffset: { width: 0, height: 0 },
           transform: [{ scale: pressed ? 0.88 : hovered ? 1.08 : 1 }],
+          ...(Platform.OS === 'web' ? {
+            boxShadow: hovered || active ? `0 0 ${active ? 16 : 12}px ${color}50` : 'none',
+            transition: 'all 0.25s ease',
+          } as any : {}),
         }]}
         accessible accessibilityLabel={label} accessibilityRole="button"
       >
@@ -458,6 +453,34 @@ export default function MapScreen() {
   });
   const [feedPage, setFeedPage] = useState(0);
   const [hoveredIncidentId, setHoveredIncidentId] = useState<string | null>(null);
+  const [hoverPreviewIncident, setHoverPreviewIncident] = useState<Incident | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startHoverPreview = useCallback((inc: Incident) => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverPreviewIncident(inc);
+    }, 800);
+  }, []);
+
+  const cancelHoverPreview = useCallback(() => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    setHoverPreviewIncident(null);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && !document.getElementById('sidebar-detail-css')) {
+      const style = document.createElement('style');
+      style.id = 'sidebar-detail-css';
+      style.textContent = `
+        @keyframes sidebarDetailSlideIn {
+          0% { opacity: 0; transform: translateY(-12px) scale(0.97); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   useEffect(() => {
     if (searchParams.focusLat && searchParams.focusLng) {
@@ -611,11 +634,14 @@ export default function MapScreen() {
   const handleMarkerPress = useCallback((marker: MapMarker) => {
     haptics.light();
     selectIncident(marker.incident);
+    setNavOpen(false);
+    setScanOpen(false);
     announce(`Selecionado: ${getCategoryMeta(marker.incident.category).label}, ${marker.incident.title}`);
   }, []);
 
   const handleMapPress = useCallback(() => {
     if (selectedIncident) selectIncident(null);
+    cancelHoverPreview();
   }, [selectedIncident]);
 
   const handleReportPress = () => { haptics.medium(); router.push('/incident/report'); };
@@ -738,65 +764,182 @@ export default function MapScreen() {
     );
   }
 
-  const incidentDetail = selectedIncident ? (
-    <View style={[showSidebar ? styles.detailPanelDesktop : styles.detailPanelMobile, { backgroundColor: showSidebar ? 'transparent' : colors.surface }]}>
-      {!showSidebar && <View style={[styles.sheetHandle, { backgroundColor: colors.textTertiary }]} />}
-      {!showSidebar && (
-        <Pressable onPress={() => selectIncident(null)} style={styles.closeBtn} accessible accessibilityLabel="Fechar" accessibilityRole="button">
-          <MaterialCommunityIcons name="close" size={22} color={colors.textSecondary} />
-        </Pressable>
-      )}
-      <View style={styles.detailHeader}>
-        <View style={[styles.detailCatIcon, { backgroundColor: Colors.category[selectedIncident.category] + '20' }]}>
-          <MaterialCommunityIcons name={getCategoryMeta(selectedIncident.category).icon as any} size={24} color={Colors.category[selectedIncident.category]} />
-        </View>
-        <View style={styles.detailHeaderText}>
-          <NeonText variant="label" color={Colors.category[selectedIncident.category]}>{getCategoryMeta(selectedIncident.category).label}</NeonText>
-          <NeonText variant="caption" color={colors.textTertiary}>{timeAgo(selectedIncident.createdAt)}{selectedIncident.address ? ` • ${selectedIncident.address}` : ''}</NeonText>
-        </View>
-        {selectedIncident.isVerified && (
-          <NeonText variant="caption" color={Colors.success} glow={Colors.success} style={{ fontWeight: '800', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>Verificado</NeonText>
+  const incidentDetail = selectedIncident ? (() => {
+    const dtCatColor = Colors.category[selectedIncident.category] || '#8A8A9A';
+    const dtSevColor = Colors.severity[selectedIncident.severity] || '#FFB800';
+    const dtCatMeta = getCategoryMeta(selectedIncident.category);
+    const isMobileView = !showSidebar;
+
+    return (
+      <View style={[showSidebar ? styles.detailPanelDesktop : styles.detailPanelMobile, { backgroundColor: showSidebar ? 'transparent' : 'transparent' }]}>
+        {/* Mobile: Swipe handle + close */}
+        {isMobileView && (
+          <View style={styles.mobileDetailTopRow}>
+            <View style={[styles.sheetHandle, { backgroundColor: dtCatColor + '50' }]} />
+            <Pressable
+              onPress={() => selectIncident(null)}
+              style={({ pressed }) => [styles.mobileCloseBtn, {
+                backgroundColor: pressed ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                borderColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+              }]}
+              accessible accessibilityLabel="Fechar" accessibilityRole="button"
+            >
+              <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
+            </Pressable>
+          </View>
         )}
-      </View>
-      <View style={styles.detailTitleRow}>
-        <NeonText variant="h4" style={styles.detailTitle}>{selectedIncident.title}</NeonText>
-      </View>
-      <NeonText variant="bodySm" color={colors.textSecondary} numberOfLines={4}>{selectedIncident.description}</NeonText>
-      <View style={styles.detailStats}>
-        <View style={styles.detailStat}><MaterialCommunityIcons name="check-circle" size={16} color={Colors.success} /><NeonText variant="bodySm" color={Colors.success}>{selectedIncident.confirmCount}</NeonText></View>
-        <View style={styles.detailStat}><MaterialCommunityIcons name="close-circle" size={16} color={Colors.error} /><NeonText variant="bodySm" color={Colors.error}>{selectedIncident.denyCount}</NeonText></View>
-        <View style={styles.detailStat}><MaterialCommunityIcons name="eye-outline" size={16} color={Colors.warning} /><NeonText variant="bodySm" color={Colors.warning}>{selectedIncident.views}</NeonText></View>
-      </View>
-      <View style={styles.detailActions}>
-        <Pressable onPress={() => { haptics.success(); useIncidentStore.getState().confirmIncident(selectedIncident.id); announce('Confirmado'); }}
-          style={({ pressed }) => [styles.actionBtn, { backgroundColor: pressed ? Colors.success + '25' : Colors.success + '12', borderColor: Colors.success + '35', transform: [{ scale: pressed ? 0.95 : 1 }] }]}
-          accessible accessibilityLabel="Confirmar" accessibilityRole="button">
-          <MaterialCommunityIcons name="check" size={18} color={Colors.success} /><NeonText variant="buttonSm" color={Colors.success}>Confirmar</NeonText>
-        </Pressable>
-        <Pressable onPress={() => { haptics.warning(); useIncidentStore.getState().denyIncident(selectedIncident.id); announce('Negado'); }}
-          style={({ pressed }) => [styles.actionBtn, { backgroundColor: pressed ? Colors.error + '25' : Colors.error + '12', borderColor: Colors.error + '35', transform: [{ scale: pressed ? 0.95 : 1 }] }]}
-          accessible accessibilityLabel="Negar" accessibilityRole="button">
-          <MaterialCommunityIcons name="close" size={18} color={Colors.error} /><NeonText variant="buttonSm" color={Colors.error}>Negar</NeonText>
-        </Pressable>
-      </View>
-      {user?.isGuardian && !selectedIncident.isVerified && (
-        <Pressable onPress={() => { haptics.heavy(); useIncidentStore.getState().verifyIncident(selectedIncident.id, user.uid, user.displayName); announce('Verificado!'); }}
-          style={({ pressed }) => [styles.actionBtn, { backgroundColor: pressed ? Colors.primary + '25' : Colors.primary + '12', borderColor: Colors.primary + '40', marginBottom: Spacing.md, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
-          accessible accessibilityLabel="Verificar como Guardião" accessibilityRole="button">
-          <MaterialCommunityIcons name="shield-check" size={18} color={Colors.primary} /><NeonText variant="buttonSm" color={Colors.primary}>Verificar como Guardião</NeonText>
-        </Pressable>
-      )}
-      {selectedIncident.isVerified && selectedIncident.verifiedByName && (
-        <NeonText variant="caption" color={colors.textTertiary} style={{ marginBottom: Spacing.xs }}>
-          Verificado por {selectedIncident.verifiedByName}
+
+        {/* Severity + Status badges row */}
+        {isMobileView && (
+          <View style={styles.mobileBadgeRow}>
+            <View style={[styles.mobileSeverityBadge, {
+              backgroundColor: dtSevColor + '18',
+              borderColor: dtSevColor + '40',
+            }]}>
+              <View style={[styles.mobileSeverityDot, {
+                backgroundColor: dtSevColor,
+                shadowColor: dtSevColor,
+              }]} />
+              <NeonText variant="caption" color={dtSevColor} style={{ fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                {selectedIncident.severity}
+              </NeonText>
+            </View>
+            {selectedIncident.isVerified && (
+              <View style={[styles.mobileSeverityBadge, {
+                backgroundColor: Colors.success + '15',
+                borderColor: Colors.success + '35',
+              }]}>
+                <MaterialCommunityIcons name="shield-check" size={12} color={Colors.success} />
+                <NeonText variant="caption" color={Colors.success} style={{ fontSize: 10, fontWeight: '800' }}>Verificado</NeonText>
+              </View>
+            )}
+            {selectedIncident.isFakeReport && (
+              <View style={[styles.mobileSeverityBadge, {
+                backgroundColor: Colors.error + '15',
+                borderColor: Colors.error + '35',
+              }]}>
+                <MaterialCommunityIcons name="alert-circle" size={12} color={Colors.error} />
+                <NeonText variant="caption" color={Colors.error} style={{ fontSize: 10, fontWeight: '800' }}>Falso</NeonText>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Category header */}
+        <View style={[styles.detailHeader, isMobileView && { marginBottom: Spacing.md + 2 }]}>
+          <View style={[styles.detailCatIcon, {
+            backgroundColor: dtCatColor + '20',
+            width: isMobileView ? 48 : 42,
+            height: isMobileView ? 48 : 42,
+            borderRadius: isMobileView ? 14 : 12,
+            borderWidth: isMobileView ? 1.5 : 0,
+            borderColor: dtCatColor + '30',
+            shadowColor: dtCatColor,
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 4,
+          }]}>
+            <MaterialCommunityIcons name={dtCatMeta.icon as any} size={isMobileView ? 26 : 24} color={dtCatColor} />
+          </View>
+          <View style={styles.detailHeaderText}>
+            <NeonText variant="label" color={dtCatColor} style={isMobileView ? { fontSize: 14, fontWeight: '700' } : undefined}>
+              {dtCatMeta.label}
+            </NeonText>
+            <NeonText variant="caption" color={colors.textTertiary} style={isMobileView ? { fontSize: 12, marginTop: 2 } : undefined}>
+              {timeAgo(selectedIncident.createdAt)}{selectedIncident.address ? ` • ${selectedIncident.address}` : ''}
+            </NeonText>
+          </View>
+          {!isMobileView && selectedIncident.isVerified && (
+            <NeonText variant="caption" color={Colors.success} glow={Colors.success} style={{ fontWeight: '800', fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>Verificado</NeonText>
+          )}
+        </View>
+
+        {/* Title */}
+        <View style={styles.detailTitleRow}>
+          <NeonText variant="h4" style={[styles.detailTitle, isMobileView && { fontSize: 17, lineHeight: 23 }]}>
+            {selectedIncident.title}
+          </NeonText>
+        </View>
+
+        {/* Description */}
+        <NeonText variant="bodySm" color={colors.textSecondary} numberOfLines={isMobileView ? 6 : 4} style={isMobileView ? { fontSize: 14, lineHeight: 20, marginBottom: Spacing.sm } : undefined}>
+          {selectedIncident.description}
         </NeonText>
-      )}
-      <View style={styles.detailReporter}>
-        <BadgeIcon level={selectedIncident.reporterLevel} size="sm" />
-        <NeonText variant="bodySm" color={colors.textSecondary} style={{ marginLeft: Spacing.sm }}>por {selectedIncident.reporterName}</NeonText>
+
+        {/* Action buttons — larger touch targets on mobile */}
+        <View style={[styles.detailStats, { flexWrap: 'wrap', gap: isMobileView ? 8 : 6 }]}>
+          <Pressable
+            onPress={() => { haptics.success(); useIncidentStore.getState().confirmIncident(selectedIncident.id); announce('Confirmado'); }}
+            style={({ pressed }) => [styles.detailStat, {
+              backgroundColor: pressed ? Colors.success + '30' : Colors.success + '10',
+              borderWidth: 1, borderColor: pressed ? Colors.success + '60' : Colors.success + '25',
+              borderRadius: isMobileView ? 10 : 8,
+              paddingHorizontal: isMobileView ? 16 : 10,
+              paddingVertical: isMobileView ? 10 : 5,
+              minHeight: isMobileView ? 44 : undefined,
+              transform: [{ scale: pressed ? 0.92 : 1 }],
+              ...(Platform.OS === 'web' ? { transition: 'transform 0.15s, background 0.15s, border-color 0.15s' } as any : {}),
+            }]}
+            accessible accessibilityLabel="Confirmar" accessibilityRole="button">
+            <MaterialCommunityIcons name="thumb-up" size={isMobileView ? 18 : 14} color={Colors.success} />
+            <NeonText variant="bodySm" color={Colors.success} style={{ fontWeight: '700', fontSize: isMobileView ? 14 : 12 }}>{selectedIncident.confirmCount}</NeonText>
+          </Pressable>
+          <Pressable
+            onPress={() => { haptics.warning(); useIncidentStore.getState().denyIncident(selectedIncident.id); announce('Negado'); }}
+            style={({ pressed }) => [styles.detailStat, {
+              backgroundColor: pressed ? Colors.error + '30' : Colors.error + '10',
+              borderWidth: 1, borderColor: pressed ? Colors.error + '60' : Colors.error + '25',
+              borderRadius: isMobileView ? 10 : 8,
+              paddingHorizontal: isMobileView ? 16 : 10,
+              paddingVertical: isMobileView ? 10 : 5,
+              minHeight: isMobileView ? 44 : undefined,
+              transform: [{ scale: pressed ? 0.92 : 1 }],
+              ...(Platform.OS === 'web' ? { transition: 'transform 0.15s, background 0.15s, border-color 0.15s' } as any : {}),
+            }]}
+            accessible accessibilityLabel="Negar" accessibilityRole="button">
+            <MaterialCommunityIcons name="thumb-down" size={isMobileView ? 18 : 14} color={Colors.error} />
+            <NeonText variant="bodySm" color={Colors.error} style={{ fontWeight: '700', fontSize: isMobileView ? 14 : 12 }}>{selectedIncident.denyCount}</NeonText>
+          </Pressable>
+          <View style={[styles.detailStat, isMobileView && { paddingHorizontal: 12, paddingVertical: 8 }]}>
+            <MaterialCommunityIcons name="eye-outline" size={isMobileView ? 18 : 14} color={Colors.warning} />
+            <NeonText variant="bodySm" color={Colors.warning} style={isMobileView ? { fontSize: 14 } : undefined}>{selectedIncident.views}</NeonText>
+          </View>
+        </View>
+
+        {/* Guardian verify button */}
+        {user?.isGuardian && !selectedIncident.isVerified && (
+          <Pressable onPress={() => { haptics.heavy(); useIncidentStore.getState().verifyIncident(selectedIncident.id, user.uid, user.displayName); announce('Verificado!'); }}
+            style={({ pressed }) => [styles.actionBtn, {
+              backgroundColor: pressed ? Colors.primary + '25' : Colors.primary + '12',
+              borderColor: Colors.primary + '40',
+              marginBottom: Spacing.md,
+              minHeight: isMobileView ? 52 : 48,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            }]}
+            accessible accessibilityLabel="Verificar como Guardião" accessibilityRole="button">
+            <MaterialCommunityIcons name="shield-check" size={isMobileView ? 22 : 18} color={Colors.primary} />
+            <NeonText variant="buttonSm" color={Colors.primary} style={isMobileView ? { fontSize: 15 } : undefined}>Verificar como Guardião</NeonText>
+          </Pressable>
+        )}
+
+        {/* Verified by info */}
+        {selectedIncident.isVerified && selectedIncident.verifiedByName && (
+          <NeonText variant="caption" color={colors.textTertiary} style={{ marginBottom: Spacing.xs, fontSize: isMobileView ? 12 : undefined }}>
+            Verificado por {selectedIncident.verifiedByName}
+          </NeonText>
+        )}
+
+        {/* Reporter info */}
+        <View style={[styles.detailReporter, isMobileView && { paddingTop: Spacing.xs, marginTop: Spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+          <BadgeIcon level={selectedIncident.reporterLevel} size={isMobileView ? 'md' : 'sm'} />
+          <NeonText variant="bodySm" color={colors.textSecondary} style={{ marginLeft: Spacing.sm, fontSize: isMobileView ? 13 : undefined }}>
+            por {selectedIncident.reporterName}
+          </NeonText>
+        </View>
       </View>
-    </View>
-  ) : null;
+    );
+  })() : null;
 
   const navPanel = (navOpen || navRoute) ? (
     <View style={[styles.navPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -982,11 +1125,15 @@ export default function MapScreen() {
         const catColor = Colors.category[inc.category] || '#8A8A9A';
         const src = SOURCE_LABELS[(inc as any).source || 'community'] || SOURCE_LABELS.community;
         return (
-          <Pressable key={inc.id} onPress={() => { haptics.light(); selectIncident(inc); }}
+          <Pressable key={inc.id} onPress={() => { haptics.light(); selectIncident(inc); cancelHoverPreview(); setFocusLocation({ latitude: inc.location.latitude, longitude: inc.location.longitude, zoom: 16 }); }}
+            // @ts-ignore web-only
+            onMouseEnter={() => { setHoveredIncidentId(inc.id); startHoverPreview(inc); }}
+            onMouseLeave={() => { setHoveredIncidentId(null); cancelHoverPreview(); }}
             style={({ pressed }) => [styles.feedItem, {
               borderBottomColor: colors.border,
-              backgroundColor: pressed ? catColor + '08' : 'transparent',
+              backgroundColor: hoverPreviewIncident?.id === inc.id ? catColor + '0C' : pressed ? catColor + '08' : 'transparent',
               borderRadius: 8, paddingHorizontal: 4,
+              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'background-color 0.2s ease' } as any : {}),
             }]}>
             <View style={[styles.feedDot, { backgroundColor: catColor }]} />
             <View style={styles.feedBody}>
@@ -1227,16 +1374,16 @@ export default function MapScreen() {
     <View style={styles.overlayContainer}>
       <Pressable style={styles.overlayBackdrop} onPress={() => setActiveOverlay(null)} />
       <View style={[styles.overlaySheet, isPhone && styles.overlaySheetMobile, {
-        backgroundColor: lightTheme ? 'rgba(250,252,255,0.82)' : 'rgba(10,10,24,0.78)',
-        borderColor: lightTheme ? 'rgba(0,0,0,0.05)' : overlayMeta[activeOverlay].color + '18',
+        backgroundColor: lightTheme ? 'rgba(250,252,255,0.94)' : 'rgba(14,16,28,0.94)',
+        borderColor: lightTheme ? 'rgba(0,0,0,0.06)' : overlayMeta[activeOverlay].color + '18',
         ...(Platform.OS === 'web' ? {
-          backdropFilter: 'blur(40px) saturate(1.4)',
-          WebkitBackdropFilter: 'blur(40px) saturate(1.4)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
           animation: 'overlay-slide-in 0.3s cubic-bezier(0.16,1,0.3,1) both',
         } as any : {}),
       }]}>
         <View style={[styles.overlayHeader, isPhone && { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }, {
-          borderBottomColor: lightTheme ? 'rgba(0,0,0,0.04)' : overlayMeta[activeOverlay].color + '12',
+          borderBottomColor: lightTheme ? 'rgba(0,0,0,0.06)' : overlayMeta[activeOverlay].color + '15',
         }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{
@@ -1274,9 +1421,13 @@ export default function MapScreen() {
       <View style={[styles.desktopContainer, { backgroundColor: colors.background }]}>
         <View style={[styles.sidebar, {
           width: sidebarWidth,
-          backgroundColor: lightTheme ? 'rgba(245,247,252,0.85)' : 'rgba(8,8,20,0.9)',
-          borderRightColor: lightTheme ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)',
-          ...(Platform.OS === 'web' ? { backdropFilter: 'blur(24px)' } as any : {}),
+          backgroundColor: lightTheme ? '#F4F6FB' : '#0C0E18',
+          borderColor: lightTheme ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+          ...(Platform.OS === 'web' ? {
+            boxShadow: lightTheme
+              ? '4px 0 24px rgba(0,0,0,0.06)'
+              : '4px 0 32px rgba(0,0,0,0.45), inset -1px 0 0 rgba(255,255,255,0.03)',
+          } as any : {}),
         }]}>
           <View style={styles.sidebarHeader}>
             <View style={[styles.appNameBox, {
@@ -1353,17 +1504,6 @@ export default function MapScreen() {
             );
           })()}
 
-          {incidentDetail && (
-            <GlassCard style={styles.sidebarDetail} glowColor={Colors.category[selectedIncident!.category] + '25'}>
-              <View style={styles.sidebarDetailClose}>
-                <Pressable onPress={() => selectIncident(null)} accessible accessibilityLabel="Desmarcar" accessibilityRole="button">
-                  <MaterialCommunityIcons name="close" size={18} color={colors.textTertiary} />
-                </Pressable>
-              </View>
-              {incidentDetail}
-            </GlassCard>
-          )}
-
           {/* Stacked layout: Feed on top, Nearby below */}
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: Spacing['4xl'] }}>
@@ -1394,21 +1534,30 @@ export default function MapScreen() {
                 const dist = haversineDistance(USER_LOCATION, item.location);
                 const distLabel = dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`;
                 const isHovered = hoveredIncidentId === item.id;
+                const isSelected = selectedIncident?.id === item.id;
                 return (
                   <Pressable
                     key={item.id}
-                    onPress={() => { haptics.light(); selectIncident(item); }}
+                    onPress={() => { haptics.light(); selectIncident(item); cancelHoverPreview(); setFocusLocation({ latitude: item.location.latitude, longitude: item.location.longitude, zoom: 16 }); }}
                     // @ts-ignore web-only
-                    onMouseEnter={() => setHoveredIncidentId(item.id)}
-                    onMouseLeave={() => setHoveredIncidentId(null)}
+                    onMouseEnter={() => { setHoveredIncidentId(item.id); startHoverPreview(item); }}
+                    onMouseLeave={() => { setHoveredIncidentId(null); cancelHoverPreview(); }}
                     style={({ pressed }) => ({
                       flexDirection: 'row', alignItems: 'center', gap: 6,
-                      paddingVertical: 6, paddingHorizontal: 6,
-                      borderRadius: 8, marginBottom: 1,
-                      backgroundColor: isHovered ? catColor + '14' : pressed ? catColor + '0C' : 'transparent',
+                      flexWrap: hoverPreviewIncident?.id === item.id ? 'wrap' as const : 'nowrap' as const,
+                      paddingVertical: 7, paddingHorizontal: 8,
+                      borderRadius: 10, marginBottom: 2,
+                      backgroundColor: isSelected
+                        ? catColor + '1E'
+                        : hoverPreviewIncident?.id === item.id ? catColor + '0A'
+                        : isHovered ? catColor + '08' : pressed ? catColor + '06' : 'transparent',
                       borderLeftWidth: 3,
-                      borderLeftColor: isHovered ? catColor : 'transparent',
-                      ...(Platform.OS === 'web' ? { transition: 'all 0.18s ease', cursor: 'pointer' } as any : {}),
+                      borderLeftColor: isSelected ? catColor : hoverPreviewIncident?.id === item.id ? catColor : isHovered ? catColor + '60' : 'transparent',
+                      ...(Platform.OS === 'web' ? {
+                        transition: 'all 0.2s cubic-bezier(0.25,0.8,0.25,1)',
+                        cursor: 'pointer',
+                        ...(isSelected ? { boxShadow: `0 2px 12px ${catColor}15, inset 0 0 0 1px ${catColor}12` } : {}),
+                      } as any : {}),
                     })}
                   >
                     <View style={{
@@ -1430,6 +1579,23 @@ export default function MapScreen() {
                       <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 9, fontWeight: '700' }}>{distLabel}</NeonText>
                       <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 7, marginTop: 1 }}>{timeAgo(item.createdAt)}</NeonText>
                     </View>
+                    {/* Inline expanded detail on hover */}
+                    {hoverPreviewIncident?.id === item.id && (
+                      <View style={{
+                        width: '100%', paddingTop: 6, marginTop: 4,
+                        borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: catColor + '20',
+                        ...(Platform.OS === 'web' ? { animation: 'sidebarDetailSlideIn 0.2s ease forwards' } as any : {}),
+                      }}>
+                        <NeonText variant="caption" color={colors.textSecondary} numberOfLines={2} style={{ fontSize: 10, lineHeight: 14, marginBottom: 4 }}>{item.description}</NeonText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <NeonText variant="caption" color={Colors.success} style={{ fontSize: 9, fontWeight: '700' }}>👍 {item.confirmCount}</NeonText>
+                          <NeonText variant="caption" color={Colors.error} style={{ fontSize: 9, fontWeight: '700' }}>👎 {item.denyCount}</NeonText>
+                          <NeonText variant="caption" color={Colors.warning} style={{ fontSize: 9, fontWeight: '700' }}>👁 {item.views}</NeonText>
+                          <View style={{ flex: 1 }} />
+                          <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 8 }}>{item.reporterName}</NeonText>
+                        </View>
+                      </View>
+                    )}
                   </Pressable>
                 );
               })}
@@ -1463,6 +1629,7 @@ export default function MapScreen() {
           </Pressable>
         </View>
 
+        {/* ── Floating Hover Preview Popup ── */}
         <View style={styles.mapArea}>
           <AttentionMap markers={mapMarkers} userLocation={USER_LOCATION} familyMembers={familyMembers}
             onMarkerPress={handleMarkerPress} onMapPress={handleMapPress}
@@ -1586,14 +1753,38 @@ export default function MapScreen() {
       {navPanel && <View style={[styles.navPanelPosMobile, driveMode && { zIndex: 30, top: 60 }]}>{navPanel}</View>}
       {guardScanPanel && <View style={[styles.scanPanelPosMobile, driveMode && { zIndex: 30, top: 60 }]}>{guardScanPanel}</View>}
 
-      {selectedIncident && (
-        <View style={[styles.mobileSheet, {
-          backgroundColor: lightTheme ? 'rgba(245,247,252,0.95)' : 'rgba(10,10,22,0.92)',
-          ...(Platform.OS === 'web' ? { backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)' } as any : {}),
-        }]}>
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.mobileSheetScroll}>{incidentDetail}</ScrollView>
-        </View>
-      )}
+      {selectedIncident && (() => {
+        const mobCatColor = Colors.category[selectedIncident.category] || '#8A8A9A';
+        const mobSevColor = Colors.severity[selectedIncident.severity] || '#FFB800';
+        return (
+          <View style={[styles.mobileSheet, {
+            backgroundColor: lightTheme ? 'rgba(245,247,252,0.97)' : 'rgba(10,10,22,0.96)',
+            borderTopColor: mobCatColor + '30',
+            borderLeftColor: mobCatColor + '15',
+            borderRightColor: mobCatColor + '15',
+            ...(Platform.OS === 'web' ? {
+              backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+              boxShadow: `0 -8px 32px rgba(0,0,0,0.45), 0 -2px 0 ${mobCatColor}20`,
+            } as any : {
+              shadowColor: mobSevColor,
+              shadowOpacity: 0.25,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: -6 },
+              elevation: 24,
+            }),
+          }]}>
+            {/* Severity color accent */}
+            <View style={[styles.mobileSheetAccent, { backgroundColor: mobSevColor }]} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.mobileSheetScroll}
+              contentContainerStyle={{ paddingBottom: Spacing['3xl'] }}
+            >
+              {incidentDetail}
+            </ScrollView>
+          </View>
+        );
+      })()}
 
       {driveHUD}
       {overlayPanel}
@@ -1609,9 +1800,53 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   desktopContainer: { flex: 1, flexDirection: 'row' },
-  sidebar: { borderRightWidth: 1, flexShrink: 0 },
+  sidebar: {
+    flexShrink: 0,
+    borderRightWidth: 1,
+    ...(Platform.OS === 'web' ? {
+      transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+    } as any : {
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      shadowOffset: { width: 2, height: 0 },
+      elevation: 8,
+    }),
+  },
   sidebarHeader: { paddingTop: Platform.OS === 'web' ? 20 : 60, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
-  sidebarDetail: { marginHorizontal: Spacing.lg, marginBottom: Spacing.md, padding: Spacing.lg },
+  sidebarDetailWrapper: {
+    marginHorizontal: Spacing.md, marginBottom: Spacing.md,
+    borderLeftWidth: 3, borderRadius: Radius.lg,
+    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? {
+      transition: 'all 0.35s cubic-bezier(0.25,0.8,0.25,1)',
+    } as any : {}),
+  },
+  sidebarDetailAccent: {
+    height: 3, width: '100%',
+    ...(Platform.OS === 'web' ? { transition: 'background-color 0.3s ease' } as any : {}),
+  },
+  sidebarDetailAccentGlow: {
+    height: '100%', width: '60%', borderRadius: 2,
+  },
+  sidebarDetail: { padding: Spacing.lg, paddingTop: Spacing.sm },
+  sidebarDetailTop: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  sidebarDetailSeverityBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1,
+  },
+  sidebarDetailSeverityDot: {
+    width: 7, height: 7, borderRadius: 4,
+  },
+  sidebarDetailCloseBtn: {
+    width: 28, height: 28, borderRadius: 8, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
+  },
   sidebarDetailClose: { alignItems: 'flex-end', marginBottom: Spacing.xs },
   sidebarTabs: {
     flexDirection: 'row', borderBottomWidth: 1,
@@ -1750,19 +1985,49 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   mobileSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '60%',
+    position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '68%',
     borderTopLeftRadius: Radius['3xl'], borderTopRightRadius: Radius['3xl'],
-    paddingTop: Spacing.md, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-    zIndex: 15,
+    paddingTop: 0,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    zIndex: 18,
     borderWidth: 1, borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 -8px 28px rgba(0,0,0,0.4)' } as any
-      : { shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 28, elevation: 22 }),
+      ? { boxShadow: '0 -8px 28px rgba(0,0,0,0.4)', transition: 'border-color 0.3s ease' } as any
+      : {}),
   },
-  mobileSheetScroll: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: Spacing.md },
+  mobileSheetAccent: {
+    height: 4, width: '100%', marginBottom: Spacing.xs,
+    borderTopLeftRadius: Radius['3xl'], borderTopRightRadius: Radius['3xl'],
+  },
+  mobileSheetScroll: { paddingHorizontal: Spacing.lg },
+  sheetHandle: { width: 48, height: 5, borderRadius: 3, alignSelf: 'center' },
   closeBtn: { position: 'absolute', top: Spacing.md, right: Spacing.lg, padding: Spacing.sm, zIndex: 5 },
+  mobileDetailTopRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingBottom: Spacing.sm, marginBottom: Spacing.xs,
+  },
+  mobileCloseBtn: {
+    width: 34, height: 34, borderRadius: 10, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mobileBadgeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: Spacing.md,
+    flexWrap: 'wrap',
+  },
+  mobileSeverityBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1,
+  },
+  mobileSeverityDot: {
+    width: 8, height: 8, borderRadius: 4,
+    shadowOpacity: 0.5, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
+  },
 
   detailPanelDesktop: {},
   detailPanelMobile: { paddingBottom: Spacing['3xl'] },
@@ -1879,23 +2144,26 @@ const styles = StyleSheet.create({
       : { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 6 }),
   },
 
-  // Overlay for Family / Profile
+  // Overlay for Family / Profile / Chain
   overlayContainer: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 30,
     justifyContent: 'center', alignItems: 'center',
   },
   overlayBackdrop: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(4px)' } as any : {}),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    ...(Platform.OS === 'web' ? {
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+    } as any : {}),
   },
   overlaySheet: {
     width: '92%', maxWidth: 520, maxHeight: '85%',
-    borderRadius: 22, borderWidth: 1,
+    borderRadius: 18, borderWidth: 1,
     overflow: 'hidden',
     ...(Platform.OS === 'web'
-      ? { boxShadow: '0 24px 48px rgba(0,0,0,0.6)' } as any
-      : { shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 48, elevation: 32 }),
+      ? { boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)' } as any
+      : { shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 32, shadowOffset: { width: 0, height: 12 }, elevation: 28 }),
   },
   overlaySheetMobile: {
     width: '100%', maxWidth: '100%', maxHeight: '100%',
@@ -1910,5 +2178,6 @@ const styles = StyleSheet.create({
   overlayCloseBtn: {
     width: 32, height: 32, borderRadius: 8, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
   },
 });

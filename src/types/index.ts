@@ -250,7 +250,7 @@ export interface ChainMessage {
   type: 'text' | 'alert' | 'location' | 'sos' | 'check_in' | 'image';
   content: string;
   location?: GeoPosition;
-  alertLevel?: 'info' | 'warning' | 'danger';
+  alertLevel?: 'info' | 'warning' | 'danger' | 'critical';
   readBy: string[];
   createdAt: number;
 }

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, Platform, Pressable } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, FlatList, Platform, Pressable, Animated, Easing } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
 import { LogoMark } from '../../src/components/ui/LogoMark';
@@ -23,6 +23,23 @@ const roleIcons: Record<string, string> = {
   admin: 'shield-account', member: 'account', kid: 'account-child',
 };
 
+function BreathingDot({ color, borderColor }: { color: string; borderColor: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.3, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+  return (
+    <Animated.View style={[styles.onlineDot, { backgroundColor: color, borderColor, transform: [{ scale }] }]} />
+  );
+}
+
 function MemberCard({ member, onLocate }: { member: FamilyMember; onLocate: () => void }) {
   const { colors } = useA11y();
   const haptics = useHaptics();
@@ -42,7 +59,7 @@ function MemberCard({ member, onLocate }: { member: FamilyMember; onLocate: () =
         <View style={[styles.avatar, { backgroundColor: color + '15', borderColor: color }]}>
           <MaterialCommunityIcons name={roleIcons[member.role] as any} size={24} color={color} />
           {member.isOnline && (
-            <View style={[styles.onlineDot, { backgroundColor: Colors.success, borderColor: colors.surface }]} />
+            <BreathingDot color={Colors.success} borderColor={colors.surface} />
           )}
         </View>
 
@@ -123,13 +140,34 @@ function MemberCard({ member, onLocate }: { member: FamilyMember; onLocate: () =
 }
 
 export default function FamilyScreen() {
-  const { colors, minTarget } = useA11y();
+  const { colors, minTarget, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const { isDesktop } = useResponsive();
   const { activeGroup, members, isLoading, loadFamily, sendCheckIn } = useFamilyStore();
   const [checkInSent, setCheckInSent] = useState(false);
+  const [kidMonitorEnabled, setKidMonitorEnabled] = useState<Record<string, boolean>>({});
+  const [monitorLocked, setMonitorLocked] = useState<Record<string, boolean>>({});
+
+  const headerOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const headerSlide = useRef(new Animated.Value(reducedMotion ? 0 : -16)).current;
+  const listOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const listSlide = useRef(new Animated.Value(reducedMotion ? 0 : 20)).current;
 
   useEffect(() => { loadFamily(); }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(headerOpacity, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(headerSlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 4 }),
+      ]),
+      Animated.parallel([
+        Animated.timing(listOpacity, { toValue: 1, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(listSlide, { toValue: 0, useNativeDriver: true, speed: 12, bounciness: 3 }),
+      ]),
+    ]).start();
+  }, [reducedMotion]);
 
   const maxWidth = isDesktop ? 640 : undefined;
 
@@ -143,7 +181,7 @@ export default function FamilyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }, isDesktop && { alignItems: 'center' }]}>
-      <View style={[styles.header, maxWidth ? { maxWidth, width: '100%' } : undefined]}>
+      <Animated.View style={[styles.header, maxWidth ? { maxWidth, width: '100%' } : undefined, { opacity: headerOpacity, transform: [{ translateY: headerSlide }] }]}>
         <View style={styles.headerTitleRow}>
           <LogoMark size={28} color={Colors.primary} />
           <View style={styles.headerTitleText}>
@@ -155,7 +193,7 @@ export default function FamilyScreen() {
             )}
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {activeGroup && (
         <FlatList
@@ -198,20 +236,126 @@ export default function FamilyScreen() {
                   accessibilityHint="Compartilhar localização em tempo real com familiares" />
               </View>
 
-              {/* Kid mode status */}
-              {members.some((m) => m.role === 'kid') && (
-                <GlassCard style={styles.kidModeCard} glowColor={Colors.warning + '15'}>
-                  <View style={styles.kidModeHeader}>
-                    <MaterialCommunityIcons name="account-child-circle" size={22} color={Colors.warning} />
-                    <NeonText variant="label" color={Colors.warning} style={{ marginLeft: Spacing.sm }}>
-                      Modo Criança Ativo
-                    </NeonText>
-                  </View>
-                  <NeonText variant="caption" color={colors.textSecondary}>
-                    Rastreamento em tempo real, monitoramento de zona segura e alertas instantâneos para crianças.
-                  </NeonText>
-                </GlassCard>
-              )}
+              {/* Kid mode status + Audio/Video monitoring */}
+              {members.filter((m) => m.role === 'kid').map((kid) => {
+                const isEnabled = kidMonitorEnabled[kid.uid] ?? false;
+                const isLocked = monitorLocked[kid.uid] ?? false;
+                return (
+                  <GlassCard key={`kid-${kid.uid}`} style={styles.kidModeCard} glowColor={Colors.warning + '15'}>
+                    <View style={styles.kidModeHeader}>
+                      <MaterialCommunityIcons name="account-child-circle" size={22} color={Colors.warning} />
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <NeonText variant="label" color={Colors.warning}>
+                          {kid.displayName} — Modo Criança
+                        </NeonText>
+                        <NeonText variant="caption" color={colors.textSecondary} style={{ fontSize: 10 }}>
+                          Rastreamento, zona segura e alertas ativos
+                        </NeonText>
+                      </View>
+                    </View>
+
+                    {/* Audio/Video Monitor */}
+                    <View style={{
+                      marginTop: Spacing.md, padding: Spacing.md,
+                      borderRadius: Radius.md, borderWidth: 1,
+                      borderColor: isEnabled ? '#FF3B7A40' : colors.border,
+                      backgroundColor: isEnabled ? '#FF3B7A08' : 'rgba(255,255,255,0.02)',
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: isEnabled ? '#FF3B7A20' : 'rgba(255,255,255,0.05)',
+                          justifyContent: 'center', alignItems: 'center',
+                        }}>
+                          <MaterialCommunityIcons name={isEnabled ? 'video' : 'video-off'} size={18} color={isEnabled ? '#FF3B7A' : colors.textTertiary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <NeonText variant="bodySm" color={isEnabled ? '#FF3B7A' : colors.textPrimary} style={{ fontWeight: '700', fontSize: 12 }}>
+                            Monitoramento Áudio & Vídeo
+                          </NeonText>
+                          <NeonText variant="caption" color={colors.textTertiary} style={{ fontSize: 9 }}>
+                            {isLocked
+                              ? (isEnabled ? '🔒 Ativado permanentemente — não pode ser alterado' : '🔒 Desativado permanentemente')
+                              : '⚠️ Após ativar/desativar, esta opção será permanente'}
+                          </NeonText>
+                        </View>
+                      </View>
+
+                      {!isLocked ? (
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: Spacing.sm }}>
+                          <Pressable
+                            onPress={() => {
+                              haptics.heavy();
+                              setKidMonitorEnabled((p) => ({ ...p, [kid.uid]: true }));
+                              setMonitorLocked((p) => ({ ...p, [kid.uid]: true }));
+                              announce(`Monitoramento de ${kid.displayName} ativado permanentemente`);
+                            }}
+                            style={({ pressed }) => ({
+                              flex: 1, paddingVertical: 10, borderRadius: Radius.md,
+                              backgroundColor: pressed ? '#FF3B7A30' : '#FF3B7A15',
+                              borderWidth: 1, borderColor: '#FF3B7A40',
+                              alignItems: 'center',
+                              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
+                            })}
+                          >
+                            <NeonText variant="caption" color="#FF3B7A" style={{ fontWeight: '800', fontSize: 10 }}>
+                              ATIVAR
+                            </NeonText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              haptics.medium();
+                              setKidMonitorEnabled((p) => ({ ...p, [kid.uid]: false }));
+                              setMonitorLocked((p) => ({ ...p, [kid.uid]: true }));
+                              announce(`Monitoramento de ${kid.displayName} desativado permanentemente`);
+                            }}
+                            style={({ pressed }) => ({
+                              flex: 1, paddingVertical: 10, borderRadius: Radius.md,
+                              backgroundColor: pressed ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                              borderWidth: 1, borderColor: colors.border,
+                              alignItems: 'center',
+                              ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
+                            })}
+                          >
+                            <NeonText variant="caption" color={colors.textTertiary} style={{ fontWeight: '700', fontSize: 10 }}>
+                              NÃO ATIVAR
+                            </NeonText>
+                          </Pressable>
+                        </View>
+                      ) : isEnabled ? (
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: Spacing.sm }}>
+                          <Pressable
+                            onPress={() => { haptics.light(); announce(`Ouvindo áudio de ${kid.displayName}...`); }}
+                            style={({ pressed }) => ({
+                              flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              paddingVertical: 10, borderRadius: Radius.md,
+                              backgroundColor: pressed ? '#FF3B7A25' : '#FF3B7A10',
+                              borderWidth: 1, borderColor: '#FF3B7A30',
+                              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                            })}
+                          >
+                            <MaterialCommunityIcons name="microphone" size={14} color="#FF3B7A" />
+                            <NeonText variant="caption" color="#FF3B7A" style={{ fontWeight: '700', fontSize: 10 }}>Ouvir Áudio</NeonText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => { haptics.light(); announce(`Visualizando câmera de ${kid.displayName}...`); }}
+                            style={({ pressed }) => ({
+                              flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              paddingVertical: 10, borderRadius: Radius.md,
+                              backgroundColor: pressed ? '#00AAFF25' : '#00AAFF10',
+                              borderWidth: 1, borderColor: '#00AAFF30',
+                              ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                            })}
+                          >
+                            <MaterialCommunityIcons name="video" size={14} color="#00AAFF" />
+                            <NeonText variant="caption" color="#00AAFF" style={{ fontWeight: '700', fontSize: 10 }}>Ver Câmera</NeonText>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
+                  </GlassCard>
+                );
+              })}
 
               <NeonText variant="label" color={colors.textSecondary} style={styles.sectionTitle}>
                 Membros ({members.length})

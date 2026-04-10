@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TextInput, KeyboardAvoidingView, Platform, ScrollView, Pressable, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, TextInput, KeyboardAvoidingView, Platform, ScrollView, Pressable, Image, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
@@ -15,11 +15,44 @@ import { Spacing, Radius } from '../../src/theme/spacing';
 const QR_URL = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=alertio://app&color=00FF88&bgcolor=0D1117';
 
 export default function SignInScreen() {
-  const { colors, typography, minTarget } = useA11y();
+  const { colors, typography, minTarget, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const { signIn, signInDemo, isLoading, authError, clearError } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const logoScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.7)).current;
+  const logoOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const formSlide = useRef(new Animated.Value(reducedMotion ? 0 : 30)).current;
+  const formOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const bottomSlide = useRef(new Animated.Value(reducedMotion ? 0 : 20)).current;
+  const bottomOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const logoFloat = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, speed: 10, bounciness: 8 }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(formSlide, { toValue: 0, useNativeDriver: true, speed: 12, bounciness: 4 }),
+        Animated.timing(formOpacity, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(bottomSlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 3 }),
+        Animated.timing(bottomOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]),
+    ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloat, { toValue: -6, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(logoFloat, { toValue: 0, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [reducedMotion]);
 
   const handleEmailSignIn = async () => {
     if (!email || !password) {
@@ -34,7 +67,8 @@ export default function SignInScreen() {
       router.replace('/(tabs)');
     } catch {
       haptics.error();
-      announce('Erro: ' + (authError || 'Credenciais inválidas'));
+      const currentError = useAuthStore.getState().authError;
+      announce('Erro: ' + (currentError || 'Credenciais inválidas'));
     }
   };
 
@@ -52,7 +86,7 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Logo section */}
-        <View style={styles.logoSection}>
+        <Animated.View style={[styles.logoSection, { opacity: logoOpacity, transform: [{ scale: logoScale }, { translateY: logoFloat }] }]}>
           <View style={styles.brandRow}>
             <View style={styles.logoMarkWrap}>
               <LogoMark size={52} color={Colors.primary} />
@@ -73,9 +107,10 @@ export default function SignInScreen() {
             </NeonText>
             <View style={[styles.taglineLine, { backgroundColor: Colors.primary + '30' }]} />
           </View>
-        </View>
+        </Animated.View>
 
         {/* Sign-in form card */}
+        <Animated.View style={{ opacity: formOpacity, transform: [{ translateY: formSlide }] }}>
         <GlassCard style={styles.formCard}>
           {authError && (
             <View
@@ -89,6 +124,7 @@ export default function SignInScreen() {
           )}
 
           <View style={styles.inputGroup}>
+            <NeonText variant="caption" color={Colors.primary + '60'} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : 'monospace', fontSize: 7, letterSpacing: 2.5 }}>CREDENTIALS</NeonText>
             <NeonText variant="label" color={colors.textSecondary}>Email</NeonText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.glass.background, borderColor: colors.border, color: colors.textPrimary, minHeight: minTarget, ...typography.body }]}
@@ -147,9 +183,10 @@ export default function SignInScreen() {
             <NeonText variant="buttonSm" color={Colors.primary}>Experimentar Modo Demo</NeonText>
           </Pressable>
         </GlassCard>
+        </Animated.View>
 
         {/* Bottom section: QR + Sign up */}
-        <View style={styles.bottomSection}>
+        <Animated.View style={[styles.bottomSection, { opacity: bottomOpacity, transform: [{ translateY: bottomSlide }] }]}>
           <View style={styles.qrRow}>
             <Image
               source={{ uri: QR_URL }}
@@ -175,7 +212,7 @@ export default function SignInScreen() {
             <NeonText variant="body" color={colors.textSecondary}>Não tem conta? </NeonText>
             <NeonText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>Cadastre-se</NeonText>
           </Pressable>
-        </View>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

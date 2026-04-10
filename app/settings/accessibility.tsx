@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, Switch } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Platform, Pressable, Switch, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
@@ -45,12 +45,12 @@ function A11yToggle({ icon, label, description, value, onToggle, color }: A11yTo
         onValueChange={(v) => {
           haptics.selection();
           onToggle(v);
-          announce(`${label} ${v ? 'enabled' : 'disabled'}`);
+          announce(`${label} ${v ? 'ativado' : 'desativado'}`);
         }}
         trackColor={{ false: colors.glass.background, true: (color ?? Colors.secondary) + '50' }}
         thumbColor={value ? (color ?? Colors.secondary) : colors.textTertiary}
         accessible
-        accessibilityLabel={`${label}, currently ${value ? 'enabled' : 'disabled'}`}
+        accessibilityLabel={`${label}, atualmente ${value ? 'ativado' : 'desativado'}`}
         accessibilityHint={description}
         accessibilityRole="switch"
       />
@@ -59,43 +59,55 @@ function A11yToggle({ icon, label, description, value, onToggle, color }: A11yTo
 }
 
 export default function AccessibilityScreen() {
-  const { colors, minTarget } = useA11y();
+  const { colors, minTarget, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const store = useAccessibilityStore();
 
+  const entryOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const entrySlide = useRef(new Animated.Value(reducedMotion ? 0 : 20)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.parallel([
+      Animated.timing(entryOpacity, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.spring(entrySlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 3 }),
+    ]).start();
+  }, [reducedMotion]);
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.scroll}
-    >
+    <View style={[styles.fullScreen, Platform.OS === 'web' ? {
+      backgroundColor: 'rgba(13,17,23,0.85)',
+      backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+      animation: 'overlay-slide-in 0.25s cubic-bezier(.16,1,.3,1)',
+    } as any : { backgroundColor: colors.background }]}>
+
+      <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} style={{ opacity: entryOpacity, transform: [{ translateY: entrySlide }] }}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={() => { haptics.light(); router.back(); }}
           style={[styles.backBtn, { minHeight: minTarget, minWidth: minTarget }]}
-          accessible
-          accessibilityLabel="Go back to settings"
-          accessibilityRole="button"
+          accessible accessibilityLabel="Voltar" accessibilityRole="button"
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
+          <MaterialCommunityIcons name="close" size={22} color={colors.textPrimary} />
         </Pressable>
         <View>
-          <NeonText variant="h3">Accessibility</NeonText>
+          <NeonText variant="h3">Acessibilidade</NeonText>
           <NeonText variant="bodySm" color={colors.textSecondary}>
-            Customize the app for your needs
+            Personalize a app para as suas necessidades
           </NeonText>
         </View>
       </View>
 
       {/* Vision */}
       <NeonText variant="label" color={Colors.secondary} style={styles.sectionTitle}>
-        Vision
+        Visão
       </NeonText>
       <GlassCard noPadding style={styles.card}>
         <A11yToggle
           icon="contrast-box"
-          label="High Contrast Mode"
-          description="Increases color contrast for better readability. Borders become more visible and text colors are brighter."
+          label="Modo Alto Contraste"
+          description="Aumenta o contraste das cores para melhor legibilidade. Bordas mais visíveis e texto mais brilhante."
           value={store.highContrast}
           onToggle={(v) => store.set('highContrast', v)}
           color="#00CCFF"
@@ -103,8 +115,8 @@ export default function AccessibilityScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <A11yToggle
           icon="format-size"
-          label="Large Text"
-          description="Increases all text sizes throughout the app for easier reading. All fonts scale up proportionally."
+          label="Texto Grande"
+          description="Aumenta o tamanho de todo o texto na app. Todas as fontes escalam proporcionalmente."
           value={store.largeText}
           onToggle={(v) => store.set('largeText', v)}
           color="#FFB800"
@@ -112,8 +124,8 @@ export default function AccessibilityScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <A11yToggle
           icon="text-to-speech"
-          label="Screen Reader Optimized"
-          description="Optimizes layouts and labels for VoiceOver and TalkBack. Adds extra context to all interactive elements."
+          label="Otimizado para Leitor de Ecrã"
+          description="Otimiza layouts e labels para VoiceOver e TalkBack. Adiciona contexto extra a todos os elementos interativos."
           value={store.screenReaderEnabled}
           onToggle={(v) => store.set('screenReaderEnabled', v)}
           color="#7B61FF"
@@ -121,8 +133,8 @@ export default function AccessibilityScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <A11yToggle
           icon="account-voice"
-          label="Voice Guidance"
-          description="Provides audio descriptions of map events and navigation cues. Reads aloud incident alerts and status changes."
+          label="Guia por Voz"
+          description="Fornece descrições sonoras de eventos no mapa e dicas de navegação. Lê alertas de incidentes em voz alta."
           value={store.voiceGuidance}
           onToggle={(v) => store.set('voiceGuidance', v)}
           color="#FF3B7A"
@@ -131,13 +143,13 @@ export default function AccessibilityScreen() {
 
       {/* Motor */}
       <NeonText variant="label" color={Colors.primary} style={styles.sectionTitle}>
-        Motor & Interaction
+        Motor & Interação
       </NeonText>
       <GlassCard noPadding style={styles.card}>
         <A11yToggle
           icon="gesture-tap-button"
-          label="Large Touch Targets"
-          description="Increases all button and interactive areas to 56px minimum for easier tapping. Recommended for users with motor impairments."
+          label="Alvos de Toque Grandes"
+          description="Aumenta todas as áreas de botões e interação para mínimo 56px. Recomendado para dificuldades motoras."
           value={store.largeTargets}
           onToggle={(v) => store.set('largeTargets', v)}
           color={Colors.primary}
@@ -145,8 +157,8 @@ export default function AccessibilityScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <A11yToggle
           icon="vibrate"
-          label="Haptic Feedback"
-          description="Provides tactile vibration feedback on button presses, confirmations, and alerts. Essential for hearing impaired users."
+          label="Feedback Háptico"
+          description="Vibração táctil ao pressionar botões, confirmações e alertas. Essencial para utilizadores com deficiência auditiva."
           value={store.hapticFeedback}
           onToggle={(v) => store.set('hapticFeedback', v)}
           color={Colors.primary}
@@ -154,8 +166,8 @@ export default function AccessibilityScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <A11yToggle
           icon="animation-play"
-          label="Reduce Motion"
-          description="Disables all animations including radar sweep, marker pulsing, and transition effects. Prevents motion sickness triggers."
+          label="Reduzir Movimento"
+          description="Desativa todas as animações incluindo varredura radar, pulsação de marcadores e efeitos de transição."
           value={store.reducedMotion}
           onToggle={(v) => store.set('reducedMotion', v)}
           color={Colors.primary}
@@ -164,13 +176,13 @@ export default function AccessibilityScreen() {
 
       {/* Cognitive */}
       <NeonText variant="label" color={Colors.warning} style={styles.sectionTitle}>
-        Cognitive & Simplification
+        Cognitivo & Simplificação
       </NeonText>
       <GlassCard noPadding style={styles.card}>
         <A11yToggle
           icon="puzzle-outline"
-          label="Simplified Interface"
-          description="Reduces visual complexity by hiding secondary information. Shows only essential content on each screen. Ideal for cognitive accessibility."
+          label="Interface Simplificada"
+          description="Reduz a complexidade visual ocultando informação secundária. Mostra apenas conteúdo essencial em cada ecrã."
           value={store.simplifiedUI}
           onToggle={(v) => store.set('simplifiedUI', v)}
           color={Colors.warning}
@@ -182,12 +194,12 @@ export default function AccessibilityScreen() {
         <MaterialCommunityIcons name="information" size={24} color={Colors.secondary} />
         <View style={styles.infoText}>
           <NeonText variant="bodySm" style={{ fontWeight: '600' }}>
-            System Accessibility
+            Acessibilidade do Sistema
           </NeonText>
           <NeonText variant="caption" color={colors.textSecondary}>
-            This app also respects your device's system accessibility settings including Dynamic Type,
-            Bold Text, Reduce Motion, VoiceOver (iOS), and TalkBack (Android). Configure those in your
-            device Settings for the best experience.
+            Esta app respeita as configurações de acessibilidade do dispositivo incluindo Tipo Dinâmico,
+            Texto Negrito, Reduzir Movimento, VoiceOver (iOS) e TalkBack (Android). Configure nas
+            Definições do dispositivo para a melhor experiência.
           </NeonText>
         </View>
       </GlassCard>
@@ -195,38 +207,39 @@ export default function AccessibilityScreen() {
       {/* Reset */}
       <View style={styles.resetSection}>
         <NeonButton
-          title="Reset to Defaults"
+          title="Repor Predefinições"
           onPress={() => {
             haptics.medium();
             store.reset();
-            announce('All accessibility settings have been reset to defaults');
+            announce('Todas as configurações de acessibilidade foram repostas');
           }}
           variant="ghost"
           icon="refresh"
-          accessibilityHint="Reset all accessibility settings to their default values"
+          accessibilityHint="Repor todas as configurações de acessibilidade para os valores predefinidos"
         />
       </View>
 
-      {/* A11y quick summary */}
+      {/* Summary */}
       <GlassCard style={styles.summaryCard}>
         <NeonText variant="label" color={colors.textSecondary} style={styles.summaryTitle}>
-          Active Accessibility Features
+          Funcionalidades de Acessibilidade Ativas
         </NeonText>
         <View style={styles.summaryChips}>
-          {store.highContrast && <Chip label="High Contrast" color="#00CCFF" />}
-          {store.largeText && <Chip label="Large Text" color="#FFB800" />}
-          {store.screenReaderEnabled && <Chip label="Screen Reader" color="#7B61FF" />}
-          {store.voiceGuidance && <Chip label="Voice Guidance" color="#FF3B7A" />}
-          {store.largeTargets && <Chip label="Large Targets" color={Colors.primary} />}
-          {store.hapticFeedback && <Chip label="Haptics" color={Colors.primary} />}
-          {store.reducedMotion && <Chip label="Reduced Motion" color={Colors.primary} />}
-          {store.simplifiedUI && <Chip label="Simplified UI" color={Colors.warning} />}
+          {store.highContrast && <Chip label="Alto Contraste" color="#00CCFF" />}
+          {store.largeText && <Chip label="Texto Grande" color="#FFB800" />}
+          {store.screenReaderEnabled && <Chip label="Leitor de Ecrã" color="#7B61FF" />}
+          {store.voiceGuidance && <Chip label="Guia por Voz" color="#FF3B7A" />}
+          {store.largeTargets && <Chip label="Alvos Grandes" color={Colors.primary} />}
+          {store.hapticFeedback && <Chip label="Hápticos" color={Colors.primary} />}
+          {store.reducedMotion && <Chip label="Mov. Reduzido" color={Colors.primary} />}
+          {store.simplifiedUI && <Chip label="UI Simplificada" color={Colors.warning} />}
           {!store.highContrast && !store.largeText && !store.screenReaderEnabled && !store.voiceGuidance && !store.largeTargets && !store.reducedMotion && !store.simplifiedUI && store.hapticFeedback && (
-            <NeonText variant="caption" color={colors.textTertiary}>Default settings (haptics only)</NeonText>
+            <NeonText variant="caption" color={colors.textTertiary}>Predefinições (apenas hápticos)</NeonText>
           )}
         </View>
       </GlassCard>
-    </ScrollView>
+    </Animated.ScrollView>
+  </View>
   );
 }
 
@@ -234,95 +247,38 @@ function Chip({ label, color }: { label: string; color: string }) {
   return (
     <View
       style={[styles.chip, { backgroundColor: color + '15', borderColor: color + '40' }]}
-      accessible
-      accessibilityLabel={`${label} is enabled`}
+      accessible accessibilityLabel={`${label} ativado`}
     >
-      <NeonText variant="caption" color={color}>
-        {label}
-      </NeonText>
+      <NeonText variant="caption" color={color}>{label}</NeonText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { paddingBottom: Spacing['6xl'] },
+  fullScreen: {
+    flex: 1,
+  },
+  scroll: { paddingBottom: Spacing['3xl'] },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Spacing.lg,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
     gap: Spacing.md,
   },
-  backBtn: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.sm,
-  },
-  sectionTitle: {
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing['2xl'],
-    marginBottom: Spacing.md,
-  },
-  card: {
-    marginHorizontal: Spacing.xl,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-  },
-  toggleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toggleText: {
-    flex: 1,
-    marginLeft: Spacing.md,
-    marginRight: Spacing.md,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: Spacing['5xl'],
-  },
-  infoCard: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.xl,
-    marginTop: Spacing['2xl'],
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    alignItems: 'flex-start',
-  },
-  infoText: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
-  resetSection: {
-    alignItems: 'center',
-    paddingTop: Spacing['2xl'],
-  },
-  summaryCard: {
-    marginHorizontal: Spacing.xl,
-    marginTop: Spacing.xl,
-    padding: Spacing.lg,
-  },
-  summaryTitle: {
-    marginBottom: Spacing.md,
-  },
-  summaryChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-  },
+  backBtn: { justifyContent: 'center', alignItems: 'center', padding: Spacing.sm },
+  sectionTitle: { paddingHorizontal: Spacing.xl, marginTop: Spacing['2xl'], marginBottom: Spacing.md },
+  card: { marginHorizontal: Spacing.xl },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.lg, paddingHorizontal: Spacing.lg },
+  toggleIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  toggleText: { flex: 1, marginLeft: Spacing.md, marginRight: Spacing.md },
+  divider: { height: StyleSheet.hairlineWidth, marginLeft: Spacing['5xl'] },
+  infoCard: { flexDirection: 'row', marginHorizontal: Spacing.xl, marginTop: Spacing['2xl'], padding: Spacing.lg, gap: Spacing.md, alignItems: 'flex-start' },
+  infoText: { flex: 1, gap: Spacing.xs },
+  resetSection: { alignItems: 'center', paddingTop: Spacing['2xl'] },
+  summaryCard: { marginHorizontal: Spacing.xl, marginTop: Spacing.xl, padding: Spacing.lg },
+  summaryTitle: { marginBottom: Spacing.md },
+  summaryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.full, borderWidth: 1 },
 });

@@ -9,8 +9,6 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Map' }} />
-      <Tabs.Screen name="feed" options={{ href: null }} />
-      <Tabs.Screen name="scan" options={{ href: null }} />
       <Tabs.Screen name="family" options={{ href: null }} />
       <Tabs.Screen name="chain" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />

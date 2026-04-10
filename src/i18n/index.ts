@@ -403,6 +403,11 @@ export function t(key: string): string {
   return translations[locale]?.[key] ?? translations['en']?.[key] ?? key;
 }
 
+export function useT(): (key: string) => string {
+  const locale = useLanguageStore((s) => s.locale);
+  return (key: string) => translations[locale]?.[key] ?? translations['en']?.[key] ?? key;
+}
+
 export const AVAILABLE_LANGUAGES: { code: Locale; name: string; nativeName: string }[] = [
   { code: 'en', name: 'English', nativeName: 'English' },
   { code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)' },

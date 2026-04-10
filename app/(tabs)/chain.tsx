@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, Platform, ScrollView, Animated, Easing } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { NeonText } from '../../src/components/ui/NeonText';
@@ -49,10 +49,30 @@ export default function ChainScreen() {
   const [addField, setAddField] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const msgListRef = useRef<FlatList>(null);
+  const sosPulse = useRef(new Animated.Value(1)).current;
+  const sosGlow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (user) loadChains(user.uid);
   }, [user?.uid]);
+
+  useEffect(() => {
+    const pulseAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sosPulse, { toValue: 1.08, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(sosPulse, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    const glowAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sosGlow, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(sosGlow, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    pulseAnim.start();
+    glowAnim.start();
+    return () => { pulseAnim.stop(); glowAnim.stop(); };
+  }, []);
 
   const handleSend = useCallback(() => {
     if (!msgInput.trim() || !activeChain || !user) return;
@@ -133,7 +153,7 @@ export default function ChainScreen() {
             {item.batteryLevel !== undefined && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                 <MaterialCommunityIcons
-                  name={(item.batteryLevel > 60 ? 'battery' : item.batteryLevel > 20 ? 'battery-50' : 'battery-alert') as any}
+                  name={(item.batteryLevel > 60 ? 'battery' : item.batteryLevel > 20 ? 'battery-medium' : 'battery-alert') as any}
                   size={12}
                   color={item.batteryLevel > 20 ? Colors.success : Colors.error}
                 />
@@ -264,13 +284,25 @@ export default function ChainScreen() {
             <LogoMark size={24} color={Colors.primary} />
             <NeonText variant="h4" color={colors.primary}>{activeChain.name}</NeonText>
           </View>
-          <NeonText variant="caption" color={colors.textTertiary}>{members.length} membros • Código: {activeChain.inviteCode}</NeonText>
+          <NeonText variant="caption" color={colors.textTertiary}>{members.length} membros • Código: <NeonText variant="caption" color={Colors.primary} style={{ fontFamily: Platform.OS === 'web' ? "'Courier New', monospace" : Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1.5, fontWeight: '700' }}>{activeChain.inviteCode}</NeonText></NeonText>
         </View>
-        <Pressable onPress={handleSOS}
-          style={({ pressed }) => [s.sosBtn, { transform: [{ scale: pressed ? 0.85 : 1 }] }]}>
-          <MaterialCommunityIcons name="alert-octagon" size={20} color="#fff" />
-          <NeonText variant="caption" color="#fff" style={{ fontWeight: '900', fontSize: 9, marginTop: 1 }}>SOS</NeonText>
-        </Pressable>
+        <Animated.View style={{
+          transform: [{ scale: sosPulse }],
+          opacity: sosGlow.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
+          ...(Platform.OS === 'web' ? {} : {
+            shadowColor: Colors.error,
+            shadowOpacity: sosGlow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }) as any,
+            shadowRadius: sosGlow.interpolate({ inputRange: [0, 1], outputRange: [6, 16] }) as any,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 8,
+          }),
+        }}>
+          <Pressable onPress={handleSOS}
+            style={({ pressed }) => [s.sosBtn, { transform: [{ scale: pressed ? 0.85 : 1 }] }]}>
+            <MaterialCommunityIcons name="alert-octagon" size={20} color="#fff" />
+            <NeonText variant="caption" color="#fff" style={{ fontWeight: '900', fontSize: 9, marginTop: 1 }}>SOS</NeonText>
+          </Pressable>
+        </Animated.View>
       </View>
 
       {/* Tabs */}
@@ -448,7 +480,7 @@ const s = StyleSheet.create({
   tab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: Spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent',
-    ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease', cursor: 'pointer' } as any : {}),
+    ...(Platform.OS === 'web' ? { transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)', cursor: 'pointer' } as any : {}),
   },
   tabBadge: {
     position: 'absolute', top: -4, right: -6,

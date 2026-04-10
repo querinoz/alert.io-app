@@ -56,17 +56,25 @@ export default function Root({ children }: PropsWithChildren) {
           }
 
           button, [role="button"] {
-            transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.2s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.2s ease, background-color 0.25s ease, border-color 0.3s ease, box-shadow 0.35s ease;
+          }
+
+          button:active, [role="button"]:active {
+            transform: scale(0.97);
           }
 
           input, textarea {
-            transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+            transition: border-color 0.3s ease, box-shadow 0.35s ease, background-color 0.25s ease;
           }
 
           input:focus, textarea:focus {
-            border-color: rgba(0, 255, 136, 0.4) !important;
-            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.08), 0 0 16px rgba(0, 255, 136, 0.06);
+            border-color: rgba(0, 255, 136, 0.45) !important;
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1), 0 0 20px rgba(0, 255, 136, 0.08);
             outline: none;
+          }
+
+          input:hover, textarea:hover {
+            border-color: rgba(255, 255, 255, 0.15) !important;
           }
 
           ::-webkit-scrollbar {
@@ -78,9 +86,10 @@ export default function Root({ children }: PropsWithChildren) {
           ::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 3px;
+            transition: background 0.2s ease;
           }
           ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.18);
           }
 
           ::selection {
@@ -93,8 +102,43 @@ export default function Root({ children }: PropsWithChildren) {
           }
 
           @keyframes overlay-slide-in {
-            from { opacity: 0; transform: translateY(12px) scale(0.97); }
+            from { opacity: 0; transform: translateY(16px) scale(0.96); }
             to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          @keyframes slideInFromRight {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+
+          @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 136, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+          }
+
+          @keyframes breathe {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+          }
+
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+
+          @keyframes floatUpDown {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
           }
 
           @media (max-width: 600px) {

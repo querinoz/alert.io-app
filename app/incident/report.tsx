@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Platform, Pressable } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TextInput, Platform, Pressable, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NeonText } from '../../src/components/ui/NeonText';
 import { NeonButton } from '../../src/components/ui/NeonButton';
 import { GlassCard } from '../../src/components/ui/GlassCard';
-import { AccessibleTouchable } from '../../src/components/ui/AccessibleTouchable';
+
 import { useA11y, announce } from '../../src/hooks/useAccessibility';
 import { useHaptics } from '../../src/hooks/useHaptics';
 import { useIncidentStore } from '../../src/stores/incidentStore';
@@ -33,6 +33,26 @@ export default function ReportScreen() {
   const [severity, setSeverity] = useState<IncidentSeverity>('medium');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+
+  const stepOpacity = useRef(new Animated.Value(1)).current;
+  const stepSlide = useRef(new Animated.Value(0)).current;
+  const stepLineProgress = useRef(new Animated.Value(0)).current;
+
+  const animateStepTransition = (nextStep: number) => {
+    const direction = nextStep > step ? 1 : -1;
+    Animated.timing(stepLineProgress, { toValue: nextStep / 2, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.parallel([
+      Animated.timing(stepOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(stepSlide, { toValue: -30 * direction, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      setStep(nextStep);
+      stepSlide.setValue(30 * direction);
+      Animated.parallel([
+        Animated.timing(stepOpacity, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(stepSlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 4 }),
+      ]).start();
+    });
+  };
 
   const handleSubmit = async () => {
     if (!category || !title) {
@@ -63,7 +83,7 @@ export default function ReportScreen() {
         <Pressable
           onPress={() => {
             haptics.light();
-            if (step > 0) setStep(step - 1);
+            if (step > 0) animateStepTransition(step - 1);
             else router.back();
           }}
           style={[styles.backBtn, { minHeight: minTarget, minWidth: minTarget }]}
@@ -105,11 +125,16 @@ export default function ReportScreen() {
           </View>
         ))}
         <View style={[styles.stepLine, { backgroundColor: colors.border }]}>
-          <View style={[styles.stepLineFill, { width: `${(step / 2) * 100}%`, backgroundColor: colors.primary }]} />
+          <Animated.View style={[styles.stepLineFill, {
+            backgroundColor: colors.primary,
+            width: stepLineProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            ...(Platform.OS === 'web' ? { boxShadow: `0 0 6px ${colors.primary}60` } as any : {}),
+          }]} />
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: stepOpacity, transform: [{ translateX: stepSlide }] }}>
         {/* Step 0: Category */}
         {step === 0 && (
           <View>
@@ -166,7 +191,7 @@ export default function ReportScreen() {
                   announce('Please select a category first');
                   return;
                 }
-                setStep(1);
+                animateStepTransition(1);
                 announce('Step 2: Add details about the incident');
               }}
               fullWidth
@@ -292,7 +317,7 @@ export default function ReportScreen() {
                   announce('Please enter a title for the incident');
                   return;
                 }
-                setStep(2);
+                animateStepTransition(2);
                 announce('Step 3: Review and confirm your report');
               }}
               fullWidth
@@ -383,6 +408,7 @@ export default function ReportScreen() {
             />
           </View>
         )}
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -448,6 +474,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
+    ...(Platform.OS === 'web' ? { transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)', cursor: 'pointer' } as any : {}),
   },
   categoryLabel: { marginTop: Spacing.sm, textAlign: 'center' },
   nextBtn: { marginTop: Spacing.md },
@@ -476,6 +503,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
+    ...(Platform.OS === 'web' ? { transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)', cursor: 'pointer' } as any : {}),
   },
   sevDot: { width: 8, height: 8, borderRadius: 4 },
   sevDotSm: { width: 6, height: 6, borderRadius: 3 },

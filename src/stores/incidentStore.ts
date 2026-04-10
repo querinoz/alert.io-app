@@ -232,7 +232,7 @@ export const useIncidentStore = create<IncidentState>()((set, get) => ({
       reporterUid: authUser?.uid ?? 'anonymous',
       reporterName: authUser?.displayName ?? 'Anônimo',
       reporterLevel: authUser?.level ?? 1,
-      reporterBadge: authUser?.badge ?? 'Observador',
+      reporterBadge: authUser?.levelName ?? 'Observador',
       ...data,
       geohash: 'mock_hash',
       address: null,

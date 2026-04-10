@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Platform, Animated, Easing } from 'react-native';
 import { useA11y } from '../../hooks/useAccessibility';
 import { Spacing } from '../../theme/spacing';
 import { getBadgeForLevel } from '../../constants/badges';
@@ -11,8 +11,22 @@ interface BadgeIconProps {
 }
 
 export function BadgeIcon({ level, size = 'md', showName }: BadgeIconProps) {
-  const { typography } = useA11y();
+  const { typography, reducedMotion } = useA11y();
   const badge = getBadgeForLevel(level);
+  const scaleAnim = useRef(new Animated.Value(reducedMotion ? 1 : 0.8)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const isGuardianTier = level >= 25;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 12, bounciness: 6 }).start();
+    if (isGuardianTier) {
+      Animated.loop(Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])).start();
+    }
+  }, [reducedMotion, isGuardianTier]);
 
   const sizes = {
     sm: { container: 30, icon: 14, nameFont: typography.caption, ring: 36, outerRing: 42 },
@@ -24,8 +38,8 @@ export function BadgeIcon({ level, size = 'md', showName }: BadgeIconProps) {
   const isGuardian = level >= 31;
 
   return (
-    <View
-      style={styles.wrapper}
+    <Animated.View
+      style={[styles.wrapper, { transform: [{ scale: Animated.multiply(scaleAnim, pulseAnim) }] }]}
       accessible
       accessibilityLabel={`Level ${level} badge: ${badge.nameEN}`}
       accessibilityRole="image"
@@ -92,7 +106,7 @@ export function BadgeIcon({ level, size = 'md', showName }: BadgeIconProps) {
           {badge.nameEN}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

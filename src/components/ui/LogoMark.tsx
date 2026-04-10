@@ -78,7 +78,10 @@ export function LogoMark({ size = 40, color = '#00FF88', spinning = true }: Logo
             <line x1={cx} y1={cy} x2={cx + 15} y2={cy - 15}
               stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.75" />
           </svg>
-          <style>{`@keyframes alertio-radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          <style>{`
+            @keyframes alertio-radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes alertio-blip-ping { 0%, 70%, 100% { opacity: 0.35; r: 1; } 30% { opacity: 0.9; r: 2; } }
+          `}</style>
         </div>
       </View>
     );

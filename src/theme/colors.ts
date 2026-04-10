@@ -121,11 +121,11 @@ export const LightColors = {
   borderFocused: 'rgba(0, 153, 115, 0.5)',
 
   glass: {
-    background: 'rgba(255, 255, 255, 0.90)',
-    backgroundHover: 'rgba(255, 255, 255, 0.95)',
-    border: 'rgba(0, 0, 0, 0.06)',
-    borderLight: 'rgba(0, 0, 0, 0.03)',
-    shadow: 'rgba(0, 20, 60, 0.06)',
+    background: 'rgba(255, 255, 255, 0.75)',
+    backgroundHover: 'rgba(255, 255, 255, 0.85)',
+    border: 'rgba(0, 0, 0, 0.08)',
+    borderLight: 'rgba(0, 0, 0, 0.04)',
+    shadow: 'rgba(0, 20, 60, 0.10)',
   },
 
   severity: {
@@ -152,7 +152,7 @@ export const LightColors = {
   },
 
   overlay: 'rgba(0, 0, 0, 0.35)',
-  scrim: 'rgba(250, 251, 254, 0.94)',
+  scrim: 'rgba(240, 242, 248, 0.92)',
 
   guardian: '#009973',
   guardianGlow: 'rgba(0, 153, 115, 0.2)',

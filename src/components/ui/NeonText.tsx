@@ -12,12 +12,12 @@ interface NeonTextProps extends TextProps {
 
 function getGlowStyle(glow: string): any {
   if (Platform.OS === 'web') {
-    return { textShadow: `0 0 12px ${glow}` };
+    return { textShadow: `0 0 10px ${glow}, 0 0 20px ${glow}40`, transition: 'text-shadow 0.3s ease' };
   }
   return {
     textShadowColor: glow,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
+    textShadowRadius: 14,
   };
 }
 

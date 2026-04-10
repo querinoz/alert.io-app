@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, Text, StyleSheet, ViewStyle, StyleProp, ActivityIndicator, View, Animated, Platform } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { Pressable, Text, StyleSheet, ViewStyle, StyleProp, ActivityIndicator, View, Animated, Platform, Easing } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useA11y, a11yProps } from '../../hooks/useAccessibility';
 import { useHaptics } from '../../hooks/useHaptics';
@@ -16,6 +16,7 @@ interface NeonButtonProps {
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  pulse?: boolean;
 }
 
 export function NeonButton({
@@ -29,11 +30,25 @@ export function NeonButton({
   fullWidth,
   style,
   accessibilityHint,
+  pulse,
 }: NeonButtonProps) {
-  const { colors, typography, minTarget } = useA11y();
+  const { colors, typography, minTarget, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
   const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!pulse || reducedMotion || disabled) return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [pulse, reducedMotion, disabled]);
 
   const variantStyles = {
     primary: {
@@ -80,16 +95,20 @@ export function NeonButton({
   const s = sizeStyles[size];
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scaleAnim, { toValue: 0.94, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 10 }).start();
   };
 
   const handlePress = () => {
     if (disabled || loading) return;
     haptics.light();
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.92, duration: 60, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 12 }),
+    ]).start();
     onPress();
   };
 
@@ -98,9 +117,14 @@ export function NeonButton({
     onMouseLeave: () => setHovered(false),
   } : {};
 
+  const pulseScale = pulse ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] }) : undefined;
+  const combinedTransform = pulseScale
+    ? [{ scale: Animated.multiply(scaleAnim, pulseScale) }]
+    : [{ scale: scaleAnim }];
+
   return (
     <Animated.View
-      style={[{ transform: [{ scale: scaleAnim }] }, fullWidth && styles.fullWidth, style]}
+      style={[{ transform: combinedTransform }, fullWidth && styles.fullWidth, style]}
       {...webHoverProps}
     >
       <Pressable
@@ -120,14 +144,16 @@ export function NeonButton({
             opacity: disabled ? 0.4 : 1,
             ...(Platform.OS === 'web'
               ? { boxShadow: variant === 'primary' && !disabled
-                  ? `0 ${pressed ? 2 : 4}px ${pressed ? 28 : hovered ? 20 : 14}px ${v.glow}${pressed ? 'E6' : hovered ? 'B3' : '66'}`
-                  : 'none' } as any
+                  ? `0 ${pressed ? 1 : hovered ? 6 : 4}px ${pressed ? 32 : hovered ? 24 : 16}px ${v.glow}${pressed ? 'E6' : hovered ? 'CC' : '66'}, inset 0 1px 0 rgba(255,255,255,${pressed ? '0.1' : '0.15'})`
+                  : variant === 'danger' && !disabled
+                    ? `0 ${pressed ? 1 : 3}px ${pressed ? 20 : 12}px ${v.glow}${pressed ? 'CC' : '55'}`
+                    : 'none' } as any
               : {
                   shadowColor: v.glow,
                   shadowOpacity: variant === 'primary' && !disabled ? (pressed ? 0.9 : hovered ? 0.7 : 0.4) : 0,
-                  shadowRadius: pressed ? 28 : hovered ? 20 : 14,
-                  shadowOffset: { width: 0, height: pressed ? 2 : 4 },
-                  elevation: variant === 'primary' ? (pressed ? 12 : 8) : 0,
+                  shadowRadius: pressed ? 32 : hovered ? 24 : 16,
+                  shadowOffset: { width: 0, height: pressed ? 1 : 4 },
+                  elevation: variant === 'primary' ? (pressed ? 14 : 8) : 0,
                 }),
           },
           fullWidth && styles.fullWidth,
@@ -176,7 +202,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   webButton: Platform.OS === 'web' ? {
-    transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+    transition: 'all 0.28s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.35s ease, background-color 0.2s ease',
     cursor: 'pointer',
   } as any : {},
   fullWidth: {

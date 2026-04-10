@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, Animated, TextInput, FlatList, Platform } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, Pressable, Animated, TextInput, FlatList, Platform, Easing } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { GlassCard } from '../ui/GlassCard';
 import { NeonText } from '../ui/NeonText';
@@ -21,10 +21,11 @@ interface IncidentCardProps {
   incident: Incident;
   onPress?: () => void;
   compact?: boolean;
+  index?: number;
 }
 
-export function IncidentCard({ incident, onPress, compact }: IncidentCardProps) {
-  const { colors, typography } = useA11y();
+export function IncidentCard({ incident, onPress, compact, index = 0 }: IncidentCardProps) {
+  const { colors, typography, reducedMotion } = useA11y();
   const haptics = useHaptics();
   const confirmIncident = useIncidentStore((s) => s.confirmIncident);
   const denyIncident = useIncidentStore((s) => s.denyIncident);
@@ -36,9 +37,36 @@ export function IncidentCard({ incident, onPress, compact }: IncidentCardProps) 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const confirmScale = useRef(new Animated.Value(1)).current;
   const denyScale = useRef(new Animated.Value(1)).current;
+  const entryAnim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const entrySlide = useRef(new Animated.Value(reducedMotion ? 0 : 20)).current;
+  const sevPulse = useRef(new Animated.Value(1)).current;
 
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const delay = Math.min(index * 70, 500);
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(entryAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(entrySlide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 3 }),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [reducedMotion, index]);
+
+  useEffect(() => {
+    if (reducedMotion || incident.severity !== 'critical') return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sevPulse, { toValue: 1.15, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(sevPulse, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [reducedMotion, incident.severity]);
 
   const isLocked = incident.isVerified || incident.isFakeReport;
   const confirmProgress = Math.min(incident.confirmCount / VERIFY_THRESHOLD, 1);
@@ -107,7 +135,7 @@ export function IncidentCard({ incident, onPress, compact }: IncidentCardProps) 
   );
 
   return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, incident.isFakeReport && { opacity: 0.5 }]}>
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }, { translateY: entrySlide }], opacity: entryAnim }, incident.isFakeReport && { opacity: 0.5 }]}>
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
@@ -134,7 +162,7 @@ export function IncidentCard({ incident, onPress, compact }: IncidentCardProps) 
                 {timeAgo(incident.createdAt)}
               </NeonText>
             </View>
-            <View style={[styles.severityDot, { backgroundColor: sevColor, ...(Platform.OS === 'web' ? { boxShadow: `0 0 4px ${sevColor}CC` } : { shadowColor: sevColor }) } as any]} />
+            <Animated.View style={[styles.severityDot, { backgroundColor: sevColor, transform: [{ scale: sevPulse }], ...(Platform.OS === 'web' ? { boxShadow: `0 0 ${incident.severity === 'critical' ? 8 : 4}px ${sevColor}CC`, transition: 'box-shadow 0.3s ease' } : { shadowColor: sevColor }) } as any]} />
           </View>
 
           <View style={styles.titleRow}>
@@ -396,10 +424,12 @@ const styles = StyleSheet.create({
   voteBtnConfirm: {
     borderColor: Colors.success + '30',
     backgroundColor: Colors.success + '08',
+    ...(Platform.OS === 'web' ? { transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)', cursor: 'pointer' } as any : {}),
   },
   voteBtnDeny: {
     borderColor: Colors.error + '30',
     backgroundColor: Colors.error + '08',
+    ...(Platform.OS === 'web' ? { transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)', cursor: 'pointer' } as any : {}),
   },
   voteBtnPressed: {
     opacity: 0.7,
