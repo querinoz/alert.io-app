@@ -1,5 +1,36 @@
 # Alert.io — Changelog
 
+## v5.0.0 — Stack Migration
+
+### Backend: Express → Hono
+- Migrated all 7 route files and auth middleware from Express to Hono
+- New entry point via `@hono/node-server` with `hono/cors`, `hono/logger`, `hono/secure-headers`
+- DB layer (`db.ts`) unchanged — pure `pg` Pool
+
+### WebSockets: Socket.io
+- Added Socket.io server with events: `location:update`, `sos:trigger`, `incident:new`, `incident:vote`, `camera:status`
+- Frontend `socket.io-client` integration in `src/services/socket.ts`
+- Zustand stores (incident, chain, family) subscribe to real-time WebSocket events
+
+### Cache / PubSub: Redis 7
+- Added `redis:7-alpine` to Docker Compose with healthcheck
+- Route caching: `GET /incidents` (30s TTL), `GET /cameras` (5min TTL)
+- `@socket.io/redis-adapter` for multi-instance WebSocket pub/sub
+- Cache invalidation on write operations
+
+### Auth: Firebase Only
+- Removed custom JWT (`jsonwebtoken`, `bcryptjs`) from backend
+- Auth middleware now verifies Firebase ID tokens via `firebase-admin`
+- Removed `/auth/login` and `/auth/register` endpoints (Firebase handles auth)
+- Added `POST /auth/me/ensure` to create DB user on first authenticated request
+
+### Removed
+- `alert-flutter/` — Expo covers all mobile/web screens
+- `JWT_SECRET` env var — no longer needed
+- `express`, `cors`, `jsonwebtoken`, `bcryptjs` dependencies
+
+---
+
 ## v4.0.0 — Full Platform Parity Release
 
 ### Security Boot Screen
@@ -45,7 +76,7 @@
 - Aligned hero buttons with fixed heights
 - Portuguese auth tab labels
 
-### Flutter Mobile App — Full Parity
+### Flutter Mobile App — Full Parity [REMOVED in v5.0.0 — replaced by Expo]
 - Security boot screen matching web
 - Demo user: Eduardo Q., rep 203750, level 31, guardian
 - Family: Querino Family, ATN3X8KP, safe zones, kid details, check-in button

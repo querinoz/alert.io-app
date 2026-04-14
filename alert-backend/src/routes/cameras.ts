@@ -1,13 +1,17 @@
-import { Router } from 'express';
-import { query } from '../db';
+import { Hono } from 'hono'
+import { query } from '../db'
+import { getCached, setCache } from '../lib/redis'
 
-const router = Router();
+const app = new Hono()
 
-router.get('/', async (_req, res) => {
+app.get('/', async (c) => {
   try {
-    const result = await query('SELECT * FROM public_cameras');
-    res.json(result.rows);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
+    const cached = await getCached<unknown[]>('cameras:all')
+    if (cached) return c.json(cached)
+    const result = await query('SELECT * FROM public_cameras')
+    await setCache('cameras:all', result.rows, 300)
+    return c.json(result.rows)
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
 
-export default router;
+export default app

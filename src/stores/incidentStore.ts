@@ -4,6 +4,7 @@ import { MOCK_INCIDENTS } from '../services/mockData';
 import { useAuthStore } from './authStore';
 import { analyzeCredibility } from '../services/credibilityEngine';
 import { fetchAllPublicData } from '../services/publicDataService';
+import { getSocket } from '../services/socket';
 
 interface IncidentState {
   incidents: Incident[];
@@ -264,3 +265,31 @@ export const useIncidentStore = create<IncidentState>()((set, get) => ({
     }));
   },
 }));
+
+let wsCleanup: (() => void) | null = null;
+
+export function subscribeIncidentsToSocket(): void {
+  if (wsCleanup) return;
+  const socket = getSocket();
+  const onBroadcast = (data: Incident) => {
+    useIncidentStore.getState().addIncidentDirect(data);
+  };
+  const onVoteUpdate = (data: { incidentId: string; vote: string; counts: { confirm: number; deny: number } }) => {
+    useIncidentStore.setState((state) => ({
+      incidents: state.incidents.map((i) =>
+        i.id === data.incidentId ? { ...i, confirmCount: data.counts.confirm, denyCount: data.counts.deny } : i
+      ),
+    }));
+  };
+  socket.on('incident:broadcast', onBroadcast);
+  socket.on('incident:vote:update', onVoteUpdate);
+  wsCleanup = () => {
+    socket.off('incident:broadcast', onBroadcast);
+    socket.off('incident:vote:update', onVoteUpdate);
+    wsCleanup = null;
+  };
+}
+
+export function unsubscribeIncidentsFromSocket(): void {
+  wsCleanup?.();
+}

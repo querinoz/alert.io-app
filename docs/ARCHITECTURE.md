@@ -1,11 +1,55 @@
-# Attention — System Architecture
+# Alert.io — System Architecture
 
-> **Pattern:** Serverless event-driven architecture
-> **Mobile:** React Native + Expo (managed workflow)
-> **Backend:** Firebase (BaaS) + Cloud Functions (Node.js 20)
+> **Pattern:** Monorepo with REST API + WebSocket backend
+> **Mobile/Web:** React Native + Expo (managed workflow)
+> **Backend:** Hono + Socket.io on Node.js (TypeScript)
+> **Database:** PostgreSQL 16 + Redis 7
+> **Auth:** Firebase Authentication (Admin SDK for token verification)
 > **Maps:** OpenFreeMap.org + MapLibre GL JS (Web), react-native-maps (Native)
 
 ---
+
+## Deployed Architecture (v5.0.0)
+
+```
+┌──────────────┐        ┌──────────────┐
+│  Landing     │        │  Expo App    │
+│  (alert-io)  │───────▶│  (Web/Mobile)│
+│  Port 8080   │        │  Port 8081   │
+└──────────────┘        └──────┬───────┘
+                               │ HTTP + WebSocket (socket.io-client)
+                               ▼
+                        ┌──────────────┐
+                        │  Hono API +  │
+                        │  Socket.io   │
+                        │  Port 3000   │
+                        └──┬───────┬───┘
+                           │       │
+                           ▼       ▼
+                    ┌──────────┐ ┌──────────┐
+                    │PostgreSQL│ │  Redis   │
+                    │Port 5432 │ │ Port 6379│
+                    └──────────┘ └──────────┘
+```
+
+### Backend Stack
+- **Hono** — lightweight HTTP framework with built-in cors, logger, secureHeaders middleware
+- **Socket.io** — WebSocket server for real-time events (location, SOS, incidents, votes)
+- **Redis** — route response caching (30s incidents, 5min cameras) + Socket.io pub/sub adapter
+- **PostgreSQL** — primary data store with parameterized queries via `pg` Pool
+- **Firebase Admin SDK** — verifies Firebase Auth ID tokens (no custom JWT)
+
+### Frontend Stack
+- **Expo + React Native** — single codebase for web + iOS + Android
+- **Zustand** — state management with WebSocket event subscriptions
+- **MapLibre GL JS** — web map rendering with OpenFreeMap tiles
+- **socket.io-client** — real-time event consumption
+
+---
+
+## Conceptual Target Architecture (Reference)
+
+> The sections below describe the full conceptual target including planned features like Cloud Functions, Firestore, and the Guardian Admin Panel.
 
 ## High-Level Architecture
 

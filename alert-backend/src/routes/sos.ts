@@ -1,39 +1,39 @@
-import { Router } from 'express';
-import { query } from '../db';
-import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { Hono } from 'hono'
+import { query } from '../db'
+import { authMiddleware, getUserId } from '../middleware/auth'
 
-const router = Router();
+const app = new Hono()
 
-router.post('/alert', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/alert', authMiddleware, async (c) => {
   try {
-    const { latitude, longitude, contactName } = req.body;
-    await query('INSERT INTO sos_alerts (user_id,alert_type,latitude,longitude,target_contact) VALUES ($1,$2,$3,$4,$5)', [req.userId, 'sos', latitude, longitude, contactName || null]);
-    res.json({ ok: true, message: 'SOS enviado' });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
+    const { latitude, longitude, contactName } = await c.req.json()
+    await query('INSERT INTO sos_alerts (user_id,alert_type,latitude,longitude,target_contact) VALUES ($1,$2,$3,$4,$5)', [getUserId(c), 'sos', latitude, longitude, contactName || null])
+    return c.json({ ok: true, message: 'SOS enviado' })
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
 
-router.post('/family-panic', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/family-panic', authMiddleware, async (c) => {
   try {
-    const { latitude, longitude } = req.body;
-    await query('INSERT INTO sos_alerts (user_id,alert_type,latitude,longitude) VALUES ($1,$2,$3,$4)', [req.userId, 'family_panic', latitude, longitude]);
-    res.json({ ok: true, message: 'Alerta familiar enviado' });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
+    const { latitude, longitude } = await c.req.json()
+    await query('INSERT INTO sos_alerts (user_id,alert_type,latitude,longitude) VALUES ($1,$2,$3,$4)', [getUserId(c), 'family_panic', latitude, longitude])
+    return c.json({ ok: true, message: 'Alerta familiar enviado' })
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
 
-router.get('/contacts', authMiddleware, async (req: AuthRequest, res) => {
+app.get('/contacts', authMiddleware, async (c) => {
   try {
-    const result = await query('SELECT * FROM sos_contacts WHERE user_id=$1', [req.userId]);
-    res.json(result.rows);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
+    const result = await query('SELECT * FROM sos_contacts WHERE user_id=$1', [getUserId(c)])
+    return c.json(result.rows)
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
 
-router.post('/contacts', authMiddleware, async (req: AuthRequest, res) => {
+app.post('/contacts', authMiddleware, async (c) => {
   try {
-    const { contactName, phoneNumber } = req.body;
-    if (!contactName || !phoneNumber) return res.status(400).json({ error: 'Campos obrigatórios' });
-    const result = await query('INSERT INTO sos_contacts (user_id,contact_name,phone_number) VALUES ($1,$2,$3) RETURNING *', [req.userId, contactName, phoneNumber]);
-    res.status(201).json(result.rows[0]);
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
+    const { contactName, phoneNumber } = await c.req.json()
+    if (!contactName || !phoneNumber) return c.json({ error: 'Campos obrigatórios' }, 400)
+    const result = await query('INSERT INTO sos_contacts (user_id,contact_name,phone_number) VALUES ($1,$2,$3) RETURNING *', [getUserId(c), contactName, phoneNumber])
+    return c.json(result.rows[0], 201)
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
 
-export default router;
+export default app

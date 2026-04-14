@@ -1,34 +1,25 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import type { MiddlewareHandler, Context } from 'hono'
+import { firebaseAuth } from '../lib/firebase'
 
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET is required in production');
-  }
-  return secret || 'alertio-dev-secret';
-}
-
-const JWT_SECRET = getJwtSecret();
-
-export interface AuthRequest extends Request {
-  userId?: string;
-}
-
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
+export const authMiddleware: MiddlewareHandler = async (c, next) => {
+  const header = c.req.header('Authorization')
   if (!header?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token não fornecido' });
+    return c.json({ error: 'Token não fornecido' }, 401)
   }
   try {
-    const decoded = jwt.verify(header.slice(7), JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
-    req.userId = decoded.userId;
-    next();
+    const decoded = await firebaseAuth.verifyIdToken(header.slice(7))
+    c.set('userId', decoded.uid)
+    c.set('email', decoded.email ?? '')
+    await next()
   } catch {
-    return res.status(401).json({ error: 'Token inválido' });
+    return c.json({ error: 'Token inválido' }, 401)
   }
 }
 
-export function signToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d', algorithm: 'HS256' });
+export function getUserId(c: Context): string {
+  return c.get('userId')
+}
+
+export function getUserEmail(c: Context): string {
+  return c.get('email')
 }

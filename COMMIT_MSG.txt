@@ -1,0 +1,19 @@
+feat: consolidate all projects into monorepo
+
+Moved alert-backend, alert-flutter, alert-io, and tile-proxy into the
+attention-app repository as subdirectories. This creates a single
+monorepo containing the entire Alert.io platform:
+
+- app/ + src/          — Expo web + mobile app (React Native)
+- alert-backend/       — Express + TypeScript REST API + PostgreSQL
+- alert-flutter/       — Flutter mobile app (Android/iOS/Web)
+- alert-io/            — Static landing page (HTML/CSS/JS)
+- tile-proxy/          — Map tile proxy for dev environments
+- docker-compose.yml   — Full-stack orchestration (Postgres + API)
+
+All cross-project references updated:
+- docker-compose.yml paths point to ./alert-backend/
+- Sub-project READMEs reference monorepo root for docker commands
+- Root .gitignore covers all sub-project build artifacts
+- Root .env.example documents all env vars across all services
+- Root README documents full architecture, setup, and all run commands

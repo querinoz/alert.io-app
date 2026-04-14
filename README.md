@@ -1,6 +1,6 @@
 # Alert.io — Community Safety Platform
 
-> Real-time incident reporting, family safety, and community vigilance. A full-stack monorepo with **Web App**, **Flutter Mobile App**, **REST API**, **Landing Page**, and **Dev Tooling**.
+> Real-time incident reporting, family safety, and community vigilance. A full-stack monorepo with **Web App**, **REST API**, **Landing Page**, and **Dev Tooling**.
 
 [![Tests](https://img.shields.io/badge/tests-55%20passed-brightgreen)](#testing)
 [![Platform](https://img.shields.io/badge/platform-web%20%7C%20iOS%20%7C%20android-blue)](#platforms)
@@ -13,15 +13,10 @@ attention-app/                    # Monorepo root
 ├── app/                          # Expo Router screens (web + mobile)
 ├── src/                          # Shared source (components, services, stores, theme)
 ├── __tests__/                    # Jest test suite (55 tests)
-├── alert-backend/                # Express + TypeScript REST API
+├── alert-backend/                # Hono + TypeScript REST API + WebSocket
 │   ├── src/                      # API routes, middleware, database
 │   ├── migrations/               # PostgreSQL schema
 │   └── Dockerfile                # Multi-stage production build
-├── alert-flutter/                # Flutter mobile app (Android/iOS/Web)
-│   ├── lib/                      # Dart source (screens, providers, services)
-│   ├── android/                  # Android platform config
-│   ├── ios/                      # iOS platform config
-│   └── web/                      # Flutter web config
 ├── alert-io/                     # Static landing page (HTML + CSS + JS)
 ├── tile-proxy/                   # Map tile proxy for dev environments
 ├── docker-compose.yml            # PostgreSQL + API orchestration
@@ -44,7 +39,7 @@ npm install
 ```bash
 cp .env.example .env
 # Edit .env — Firebase keys are optional (app works in demo mode)
-# Docker vars (POSTGRES_PASSWORD, JWT_SECRET) are required for backend
+# Docker vars (POSTGRES_PASSWORD) are required for backend
 ```
 
 ### 3. Start the Backend (Docker)
@@ -55,7 +50,8 @@ docker-compose up -d
 
 This starts:
 - **PostgreSQL 16** on `localhost:5432` (localhost only)
-- **REST API** on `localhost:3000`
+- **Redis 7** on `localhost:6379` (localhost only)
+- **REST API + WebSocket** on `localhost:3000`
 
 ### 4. Run the Web App
 
@@ -68,11 +64,6 @@ npx expo start --web --port 8081
 ```bash
 # Android / iOS via Expo Go
 npx expo start --lan --port 8081
-
-# Flutter mobile app (separate)
-cd alert-flutter
-flutter pub get
-flutter run
 ```
 
 ### 6. Serve the Landing Page
@@ -87,8 +78,7 @@ npx serve -s -l 8080 alert-io
 |-----------|-----------|-------------|------|
 | **Web App** | Expo + React Native Web | `npx expo start --web` | 8081 |
 | **Mobile App** | Expo + React Native | `npx expo start --lan` | 8081 |
-| **Flutter App** | Flutter 3.16+ | `cd alert-flutter && flutter run` | — |
-| **REST API** | Express + TypeScript | `docker-compose up -d` | 3000 |
+| **REST API + WS** | Hono + Socket.io | `docker-compose up -d` | 3000 |
 | **Landing Page** | Static HTML/JS | `npx serve -s -l 8080 alert-io` | 8080 |
 | **Tile Proxy** | Node.js | `node tile-proxy/server.js` | 8888 |
 
@@ -106,17 +96,12 @@ npx serve -s -l 8080 alert-io
 - **ErrorBoundary** — graceful crash recovery
 - **Accessibility** — VoiceOver/TalkBack labels, high contrast, reduced motion
 
-### Flutter App
-- Native Android/iOS/Web with Riverpod state management
-- Encrypted token storage via `flutter_secure_storage`
-- Configurable API URL via `--dart-define`
-- 9 screens: map, feed, chain, family, profile, login, register, boot, home
-
 ### Backend API
-- JWT auth with pinned HS256, 7-day expiry
+- **Hono** framework with secure headers, CORS, structured logging
+- **Firebase Auth** token verification (no custom JWT/bcrypt)
+- **Socket.io WebSockets** for real-time location, SOS, incidents, votes
+- **Redis** cache (incidents 30s, cameras 5min) + Socket.io pub/sub adapter
 - Parameterized SQL (no injection)
-- bcrypt password hashing
-- CORS restricted to configured origins
 - Ownership verification on family/chain operations
 - Multi-stage Docker build (non-root, healthcheck)
 
@@ -143,9 +128,12 @@ EXPO_PUBLIC_ENABLE_AUTO_DEMO=false
 POSTGRES_DB=alertio
 POSTGRES_USER=alertio
 POSTGRES_PASSWORD=<strong-random-password>
-JWT_SECRET=<64-char-random-string>
 NODE_ENV=development
 CORS_ORIGINS=http://localhost:8081,http://localhost:8080
+EXPO_PUBLIC_API_URL=http://localhost:3000
+FIREBASE_PROJECT_ID=your_project_id
+REDIS_HOST=localhost
+REDIS_PORT=6379
 ```
 
 ## Testing
@@ -157,9 +145,6 @@ npm test
 # Backend type check
 cd alert-backend && npx tsc --noEmit
 
-# Flutter analysis
-cd alert-flutter && flutter analyze
-
 # Expo lint
 npx expo lint
 
@@ -170,25 +155,24 @@ npx expo export --platform web
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│  Landing     │     │  Web/Mobile  │     │  Flutter App  │
-│  (alert-io)  │────▶│  (Expo)      │     │  (alert-      │
-│  Port 8080   │     │  Port 8081   │     │   flutter)    │
-└─────────────┘     └──────┬───────┘     └───────┬───────┘
-                           │                     │
-                           ▼                     ▼
-                    ┌──────────────┐     ┌──────────────┐
-                    │  REST API    │     │  Tile Proxy  │
-                    │  (alert-     │     │  (tile-proxy)│
-                    │   backend)   │     │  Port 8888   │
-                    │  Port 3000   │     └──────────────┘
-                    └──────┬───────┘
-                           │
+┌─────────────┐     ┌──────────────┐
+│  Landing     │     │  Web/Mobile  │
+│  (alert-io)  │────▶│  (Expo)      │
+│  Port 8080   │     │  Port 8081   │
+└─────────────┘     └──────┬───────┘
+                           │ HTTP + WebSocket
                            ▼
-                    ┌──────────────┐
-                    │  PostgreSQL  │
-                    │  Port 5432   │
-                    └──────────────┘
+                    ┌──────────────┐     ┌──────────────┐
+                    │  Hono API +  │     │  Tile Proxy  │
+                    │  Socket.io   │     │  (tile-proxy)│
+                    │  Port 3000   │     │  Port 8888   │
+                    └──┬───────┬───┘     └──────────────┘
+                       │       │
+                       ▼       ▼
+                ┌──────────┐ ┌──────────┐
+                │PostgreSQL│ │  Redis   │
+                │Port 5432 │ │ Port 6379│
+                └──────────┘ └──────────┘
 ```
 
 ## Tech Stack
@@ -196,23 +180,24 @@ npx expo export --platform web
 | Layer | Technology |
 |-------|-----------|
 | **Web/Mobile Framework** | React Native + Expo (SDK 52) |
-| **Flutter Framework** | Flutter 3.16+ with Riverpod |
-| **Backend** | Express 4.21 + TypeScript |
+| **Backend** | Hono + @hono/node-server + TypeScript |
+| **WebSocket** | Socket.io + Redis adapter |
 | **Database** | PostgreSQL 16 |
-| **Auth** | Firebase Authentication / JWT |
+| **Cache / PubSub** | Redis 7 |
+| **Auth** | Firebase Authentication (Admin SDK) |
 | **Map** | MapLibre GL JS + OpenFreeMap |
-| **State** | Zustand (Expo) / Riverpod (Flutter) |
+| **State** | Zustand |
 | **Testing** | Jest + ts-jest |
 | **Deployment** | Vercel (web), EAS Build (mobile), Docker (API) |
 
 ## Security
 
 - No hardcoded secrets — all env-driven with fail-fast in production
-- JWT with pinned HS256 algorithm, 7-day expiry
+- Firebase Auth token verification via Admin SDK
 - CORS restricted to configured origins
-- CSP + HSTS + Permissions-Policy headers (Vercel)
+- Secure headers (CSP, HSTS, Permissions-Policy) via Hono middleware
 - Multi-stage Docker build with non-root user
-- Encrypted token storage on mobile
+- Redis on localhost-only binding
 - No cleartext HTTP traffic in production
 
 ## Detailed Documentation
@@ -220,7 +205,6 @@ npx expo export --platform web
 | Doc | Location |
 |-----|----------|
 | Backend API docs | [`alert-backend/README.md`](alert-backend/README.md) |
-| Flutter app docs | [`alert-flutter/README.md`](alert-flutter/README.md) |
 | Landing page docs | [`alert-io/README.md`](alert-io/README.md) |
 | Tile proxy docs | [`tile-proxy/README.md`](tile-proxy/README.md) |
 | Architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |

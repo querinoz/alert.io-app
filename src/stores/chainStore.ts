@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Chain, ChainMember, ChainMessage, ChainAlert, ChainMemberType, GeoPosition, ChainMemberMeta } from '../types';
 import { ChainDB, ChainMemberDB, ChainMessageDB, ChainAlertDB } from '../services/database';
+import { getSocket } from '../services/socket';
 
 interface ChainState {
   chains: Chain[];
@@ -158,3 +159,31 @@ export const useChainStore = create<ChainState>()((set, get) => ({
     set({ alerts, messages });
   },
 }));
+
+let chainWsCleanup: (() => void) | null = null;
+
+export function subscribeChainToSocket(): void {
+  if (chainWsCleanup) return;
+  const socket = getSocket();
+  const onLocation = (data: { userId: string; lat: number; lng: number }) => {
+    useChainStore.setState((state) => ({
+      members: state.members.map((m) =>
+        m.ownerUid === data.userId ? { ...m, location: { latitude: data.lat, longitude: data.lng } } : m
+      ),
+    }));
+  };
+  const onSos = (data: { userId: string; lat: number; lng: number }) => {
+    console.log('[WS] SOS alert received from', data.userId);
+  };
+  socket.on('location:update', onLocation);
+  socket.on('sos:alert', onSos);
+  chainWsCleanup = () => {
+    socket.off('location:update', onLocation);
+    socket.off('sos:alert', onSos);
+    chainWsCleanup = null;
+  };
+}
+
+export function unsubscribeChainFromSocket(): void {
+  chainWsCleanup?.();
+}
