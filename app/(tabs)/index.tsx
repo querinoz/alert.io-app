@@ -445,12 +445,21 @@ export default function MapScreen() {
   const [viewingCamera, setViewingCamera] = useState<PublicCamera | null>(null);
   const [showCameras, setShowCameras] = useState(true);
   const [camerasLoading, setCamerasLoading] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(() => {
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return !localStorage.getItem('alertio_tutorial_done');
+      if (!localStorage.getItem('alertio_tutorial_done')) setShowTutorial(true);
+    } else {
+      (async () => {
+        try {
+          const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+          const done = await AsyncStorage.getItem('alertio_tutorial_done');
+          if (!done) setShowTutorial(true);
+        } catch { setShowTutorial(true); }
+      })();
     }
-    return false;
-  });
+  }, []);
   const [feedPage, setFeedPage] = useState(0);
   const [hoveredIncidentId, setHoveredIncidentId] = useState<string | null>(null);
   const [hoverPreviewIncident, setHoverPreviewIncident] = useState<Incident | null>(null);
@@ -719,6 +728,10 @@ export default function MapScreen() {
     setShowTutorial(false);
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       localStorage.setItem('alertio_tutorial_done', '1');
+    } else {
+      import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+        AsyncStorage.setItem('alertio_tutorial_done', '1');
+      }).catch(() => {});
     }
   }, []);
 

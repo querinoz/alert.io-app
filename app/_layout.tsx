@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState, Component, type ErrorInfo, type ReactNode } from 'react';
+import React, { useEffect, useState, Component, type ErrorInfo, type ReactNode } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Platform, Text, Pressable } from 'react-native';
+import { View, StyleSheet, Text, Pressable } from 'react-native';
 import { useAuthStore } from '../src/stores/authStore';
 import { Colors } from '../src/theme/colors';
 import { SecurityBootScreen } from '../src/components/ui/SecurityBootScreen';
@@ -46,33 +46,10 @@ const errStyles = StyleSheet.create({
   buttonText: { color: '#0D1117', fontWeight: '700', fontSize: 14 },
 });
 
-const ENABLE_AUTO_DEMO = process.env.EXPO_PUBLIC_ENABLE_AUTO_DEMO === 'true';
-
-function useAutoLogin() {
-  const ran = useRef(false);
-  const { signInDemo, isAuthenticated } = useAuthStore();
-
-  useEffect(() => {
-    if (!ENABLE_AUTO_DEMO) return;
-    if (ran.current || isAuthenticated) return;
-    ran.current = true;
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('autologin') === '1') {
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    }
-    signInDemo();
-  }, [isAuthenticated, signInDemo]);
-}
-
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, initAuthListener } = useAuthStore();
-
-  useAutoLogin();
 
   useEffect(() => {
     const unsub = initAuthListener();

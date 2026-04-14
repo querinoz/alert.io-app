@@ -466,7 +466,7 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
     </div>
     <div class="nav-links" id="navLinks">
       <a href="#features" data-nav>Produto</a>
-      <a href="#mapdemo" data-nav>Demo</a>
+      <a href="#mapdemo" data-nav>Mapa</a>
       <a href="#pricing" data-nav>Preços</a>
       <a href="#feed" data-nav>Feed</a>
       <button class="btn-primary" onclick="openModal()">[ ENTRAR ]</button>
@@ -490,13 +490,8 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
       <button class="btn-ghost" style="padding:0 28px;height:46px;font-size:13px" onclick="goTo('#mapdemo')">Ver mapa ao vivo →</button>
     </div>
     <div style="margin-top:24px;animation:h1-enter 1s cubic-bezier(.16,1,.3,1) .7s both">
-      <button class="btn-livedemo" onclick="openLiveDemo()">
-        <span class="btn-livedemo-dot"></span>
-        <span>VER DEMO AO VIVO</span>
-        <span class="btn-livedemo-arrow">→</span>
-      </button>
       <p style="font-size:10px;color:var(--muted);margin-top:8px;letter-spacing:1px;font-family:system-ui,sans-serif">
-        Veja todas as funcionalidades a funcionar automaticamente — sem criar conta
+        Monitorização comunitária 24/7 — registe-se gratuitamente
       </p>
     </div>
   </div>
@@ -577,8 +572,7 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
         <h3>Bem-vindo ao <span style="color:var(--green)">Alert.io</span></h3>
         <p>Sessão iniciada. A redirecionar para a aplicação...</p>
         <div style="display:flex;gap:10px">
-          <a href="/app?autologin=1" class="btn-primary" style="flex:1;justify-content:center;padding:10px;text-decoration:none">[ ENTRAR NA APP ]</a>
-          <button class="btn-ghost" style="flex:1;justify-content:center;padding:10px" onclick="goTo('#mapdemo')">Ver Demo →</button>
+          <a href="/app" class="btn-primary" style="flex:1;justify-content:center;padding:10px;text-decoration:none">[ ENTRAR NA APP ]</a>
         </div>
       </div>
     </div>
@@ -600,7 +594,7 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
 <!-- ═══════════ MAP DEMO ═══════════ -->
 <section class="mapdemo-section" id="mapdemo">
   <div class="wrap">
-    <div class="section-title reveal">// Mapa de incidentes — Demo ao vivo</div>
+    <div class="section-title reveal">// Mapa de incidentes — Tempo real</div>
     <div class="mapdemo-wrap reveal-scale">
       <div class="mapdemo-bar">
         <div class="mapdemo-bar-left">
@@ -691,9 +685,9 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
         </ul>
         <button class="plan-btn primary" onclick="goTo('#auth')">[ COMEÇAR 14 DIAS GRÁTIS ]</button>
         <div style="text-align:center;margin-top:12px">
-          <a href="javascript:openLiveDemo()" style="display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);letter-spacing:1px;transition:color .2s">
-            <span style="width:6px;height:6px;border-radius:50%;background:#FF2D2D;animation:pulse 1.5s ease-in-out infinite"></span>
-            Ver demo ao vivo antes de comprar →
+          <a href="#mapdemo" onclick="goTo('#mapdemo');return false" style="display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);letter-spacing:1px;transition:color .2s">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite"></span>
+            Ver mapa de incidentes ao vivo →
           </a>
         </div>
       </div>
@@ -710,11 +704,7 @@ body::after{content:'';position:fixed;width:500px;height:500px;border-radius:50%
     </div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <button class="btn-primary" style="padding:0 32px;height:48px;font-size:14px" onclick="goTo('#auth')">[ COMEÇAR GRÁTIS ]</button>
-      <button class="btn-livedemo btn-livedemo-sm" onclick="openLiveDemo()">
-        <span class="btn-livedemo-dot"></span>
-        <span>VER DEMO</span>
-        <span class="btn-livedemo-arrow">→</span>
-      </button>
+      <button class="btn-ghost" style="padding:0 28px;height:48px;font-size:13px" onclick="goTo('#mapdemo')">Ver mapa →</button>
     </div>
   </div>
 </section>
@@ -819,11 +809,10 @@ function goTo(sel) {
 }
 function goToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
-/* ═══ LIVE DEMO — opens the app with auto-starting demo ═══ */
-function openLiveDemo() {
-  var demoUrl = (window.ALERT_APP_URL || '/app') + '/?demo=1&autostart=1';
-  var w = window.open(demoUrl, '_blank', 'noopener');
-  if (!w) window.location.href = demoUrl;
+/* ═══ APP LINK ═══ */
+function openApp() {
+  var appUrl = window.ALERT_APP_URL || '/app';
+  window.open(appUrl, '_blank', 'noopener');
 }
 
 /* ═══ NAV SCROLL EFFECT ═══ */
@@ -1275,7 +1264,7 @@ var LANG_DATA = {
     'hero.cta1': '[ COMEÇAR GRÁTIS ]', 'hero.cta2': 'Ver mapa ao vivo →',
     'auth.title': 'Aceder ao', 'auth.subtitle': 'MONITORIZAÇÃO EM TEMPO REAL',
     'auth.login': 'ENTRAR', 'auth.register': 'CRIAR CONTA',
-    'nav.product': 'Produto', 'nav.demo': 'Demo', 'nav.pricing': 'Preços', 'nav.feed': 'Feed', 'nav.enter': '[ ENTRAR ]',
+    'nav.product': 'Produto', 'nav.demo': 'Mapa', 'nav.pricing': 'Preços', 'nav.feed': 'Feed', 'nav.enter': '[ ENTRAR ]',
     'pricing.free': 'GRATUITO', 'pricing.premium': 'PREMIUM', 'pricing.free.price': '0', 'pricing.premium.price': '4',
     'cta.title': 'Pronto para', 'cta.accent': 'reagir mais rápido?', 'cta.sub': 'Comece grátis. Atualize para Premium por apenas 4,99€/mês.',
     'footer.copy': '© 2026 Alert.io — From alert to action.',
@@ -1287,7 +1276,7 @@ var LANG_DATA = {
     'hero.cta1': '[ GET STARTED FREE ]', 'hero.cta2': 'See live map →',
     'auth.title': 'Access', 'auth.subtitle': 'REAL-TIME MONITORING',
     'auth.login': 'LOGIN', 'auth.register': 'CREATE ACCOUNT',
-    'nav.product': 'Product', 'nav.demo': 'Demo', 'nav.pricing': 'Pricing', 'nav.feed': 'Feed', 'nav.enter': '[ LOGIN ]',
+    'nav.product': 'Product', 'nav.demo': 'Map', 'nav.pricing': 'Pricing', 'nav.feed': 'Feed', 'nav.enter': '[ LOGIN ]',
     'pricing.free': 'FREE', 'pricing.premium': 'PREMIUM', 'pricing.free.price': '0', 'pricing.premium.price': '4',
     'cta.title': 'Ready to', 'cta.accent': 'react faster?', 'cta.sub': 'Start free. Upgrade to Premium for just €4.99/month.',
     'footer.copy': '© 2026 Alert.io — From alert to action.',
@@ -1299,7 +1288,7 @@ var LANG_DATA = {
     'hero.cta1': '[ EMPEZAR GRATIS ]', 'hero.cta2': 'Ver mapa en vivo →',
     'auth.title': 'Acceder a', 'auth.subtitle': 'MONITOREO EN TIEMPO REAL',
     'auth.login': 'ENTRAR', 'auth.register': 'CREAR CUENTA',
-    'nav.product': 'Producto', 'nav.demo': 'Demo', 'nav.pricing': 'Precios', 'nav.feed': 'Feed', 'nav.enter': '[ ENTRAR ]',
+    'nav.product': 'Producto', 'nav.demo': 'Mapa', 'nav.pricing': 'Precios', 'nav.feed': 'Feed', 'nav.enter': '[ ENTRAR ]',
     'pricing.free': 'GRATUITO', 'pricing.premium': 'PREMIUM', 'pricing.free.price': '0', 'pricing.premium.price': '4',
     'cta.title': '¿Listo para', 'cta.accent': 'reaccionar más rápido?', 'cta.sub': 'Empieza gratis. Actualiza a Premium por solo 4,99€/mes.',
     'footer.copy': '© 2026 Alert.io — De la alerta a la acción.',

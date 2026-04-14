@@ -18,16 +18,26 @@ interface TutorialStep {
   title: string;
   body: string;
   target: SpotlightTarget;
-  tipSide: 'top' | 'bottom' | 'left' | 'right';
+  tipSide: 'top' | 'bottom' | 'left' | 'right' | 'center';
   color: string;
 }
 
+const WELCOME_STEP: TutorialStep = {
+  icon: 'shield-check',
+  title: 'Bem-vindo ao Alert.io',
+  body: 'A sua plataforma de segurança comunitária em tempo real. Vamos mostrar-lhe as funcionalidades principais em poucos passos.',
+  target: { x: SW * 0.1, y: SH * 0.25, w: SW * 0.8, h: SH * 0.3 },
+  tipSide: 'center',
+  color: Colors.primary,
+};
+
 function getDesktopSteps(sidebarW: number): TutorialStep[] {
   return [
+    WELCOME_STEP,
     {
       icon: 'map',
       title: 'Mapa Interativo',
-      body: 'Este é o mapa em tempo real. Veja todos os incidentes reportados pela comunidade e fontes públicas. Clique nos marcadores para ver detalhes.',
+      body: 'Mapa em tempo real com todos os incidentes reportados pela comunidade e fontes públicas. Clique nos marcadores para ver detalhes.',
       target: { x: sidebarW, y: 0, w: SW - sidebarW, h: SH },
       tipSide: 'left',
       color: Colors.primary,
@@ -35,7 +45,7 @@ function getDesktopSteps(sidebarW: number): TutorialStep[] {
     {
       icon: 'map-marker-multiple',
       title: 'Incidentes por Perto',
-      body: 'A barra lateral mostra os incidentes próximos à sua localização. Clique num incidente para o ver no mapa.',
+      body: 'A barra lateral mostra os incidentes próximos. Clique num incidente para voar até à sua localização no mapa.',
       target: { x: 0, y: 160, w: sidebarW, h: SH - 200 },
       tipSide: 'right',
       color: Colors.cyan,
@@ -43,7 +53,7 @@ function getDesktopSteps(sidebarW: number): TutorialStep[] {
     {
       icon: 'plus-circle',
       title: 'Reportar Incidente',
-      body: 'Viu algo suspeito? Toque em "Reportar" para criar um alerta. O algoritmo de credibilidade analisa cada reporte para manter a comunidade segura.',
+      body: 'Viu algo suspeito? Toque em "Reportar" para criar um alerta. O algoritmo de credibilidade analisa cada reporte automaticamente.',
       target: { x: sidebarW + 16, y: 8, w: 52, h: 52 },
       tipSide: 'bottom',
       color: Colors.warning,
@@ -51,7 +61,7 @@ function getDesktopSteps(sidebarW: number): TutorialStep[] {
     {
       icon: 'link-variant',
       title: 'Cadeia, Família & Perfil',
-      body: 'Use os botões do topo para aceder ao sistema de Cadeia (conecte-se com vizinhos), Família (acompanhe familiares) e o seu Perfil.',
+      body: 'Conecte-se com vizinhos (Cadeia), acompanhe familiares em tempo real (Família) e veja o seu nível e reputação (Perfil).',
       target: { x: 12, y: 90, w: sidebarW - 24, h: 40 },
       tipSide: 'bottom',
       color: '#FF9800',
@@ -59,7 +69,7 @@ function getDesktopSteps(sidebarW: number): TutorialStep[] {
     {
       icon: 'steering',
       title: 'Modo Condução & Câmeras',
-      body: 'Active o Modo Condução para navegar com alertas em tempo real, radares e limite de velocidade. Use o botão de câmeras para ver câmeras públicas no mapa.',
+      body: 'Active o Modo Condução para navegar com alertas de radar e limite de velocidade. Use o botão de câmeras para ver câmeras públicas.',
       target: { x: sidebarW + SW * 0.35, y: SH - 80, w: 200, h: 52 },
       tipSide: 'top',
       color: '#00AAFF',
@@ -69,10 +79,11 @@ function getDesktopSteps(sidebarW: number): TutorialStep[] {
 
 function getMobileSteps(): TutorialStep[] {
   return [
+    WELCOME_STEP,
     {
       icon: 'map',
       title: 'Mapa Interativo',
-      body: 'Este é o mapa em tempo real. Veja todos os incidentes reportados pela comunidade e fontes públicas de segurança.',
+      body: 'Mapa em tempo real com incidentes da comunidade e fontes públicas de segurança. Toque nos marcadores para detalhes.',
       target: { x: 0, y: 0, w: SW, h: SH },
       tipSide: 'top',
       color: Colors.primary,
@@ -96,15 +107,15 @@ function getMobileSteps(): TutorialStep[] {
     {
       icon: 'link-variant',
       title: 'Cadeia & Família',
-      body: 'Aceda ao sistema de Cadeia e Família através dos ícones no topo. Conecte-se com vizinhos e acompanhe familiares.',
+      body: 'Conecte-se com vizinhos (Cadeia) e acompanhe familiares em tempo real (Família) através dos ícones de navegação.',
       target: { x: 8, y: 50, w: SW - 16, h: 44 },
       tipSide: 'bottom',
       color: '#FF9800',
     },
     {
-      icon: 'steering',
-      title: 'Modo Condução',
-      body: 'Active o Modo Condução para navegar com velocímetro, alertas de radar e incidentes na estrada em tempo real.',
+      icon: 'account-star',
+      title: 'Perfil & Reputação',
+      body: 'Ganhe reputação ao reportar e confirmar incidentes. Suba de nível de Observador Iniciante a Guardião Supremo — são 32 níveis!',
       target: { x: SW - 60, y: 50, w: 44, h: 44 },
       tipSide: 'bottom',
       color: Colors.secondary,
@@ -112,7 +123,13 @@ function getMobileSteps(): TutorialStep[] {
   ];
 }
 
-function SpotlightBackdrop({ target, opacity }: { target: SpotlightTarget; opacity: number }) {
+function SpotlightBackdrop({ target, opacity, isWelcome }: { target: SpotlightTarget; opacity: number; isWelcome: boolean }) {
+  if (isWelcome) {
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(6,6,16,${opacity * 0.85})` }} />
+    );
+  }
+
   const pad = 8;
   const r = 14;
   const sx = target.x - pad;
@@ -121,7 +138,7 @@ function SpotlightBackdrop({ target, opacity }: { target: SpotlightTarget; opaci
   const sh = target.h + pad * 2;
 
   if (Platform.OS !== 'web') {
-    return <View style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${opacity * 0.7})` }} />;
+    return <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: `rgba(0,0,0,${opacity * 0.7})` }} />;
   }
 
   return (
@@ -160,6 +177,7 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
   const total = steps.length;
   const current = steps[step];
   const isLast = step === total - 1;
+  const isWelcome = step === 0;
 
   useEffect(() => {
     Animated.parallel([
@@ -197,7 +215,9 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
     if (step > 0) animateStep(step - 1);
   };
 
-  const tipPos = getTipPosition(current.target, current.tipSide);
+  const tipPos = isWelcome
+    ? { top: SH * 0.3, left: Math.max(20, (SW - 340) / 2) }
+    : getTipPosition(current.target, current.tipSide);
 
   return (
     <View style={{
@@ -205,10 +225,10 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
       pointerEvents: 'box-none',
     } as any}>
 
-      <SpotlightBackdrop target={current.target} opacity={1} />
+      <SpotlightBackdrop target={current.target} opacity={1} isWelcome={isWelcome} />
 
-      {/* Animated pulse ring around target center */}
-      {Platform.OS === 'web' && (
+      {/* Pulse ring (not on welcome) */}
+      {!isWelcome && Platform.OS === 'web' && (
         <Animated.View style={{
           position: 'absolute',
           left: current.target.x + current.target.w / 2 - 30,
@@ -234,7 +254,7 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
         pointerEvents: 'auto',
       } as any]}>
         <View style={{
-          width: 320, maxWidth: SW - 40,
+          width: isWelcome ? 360 : 320, maxWidth: SW - 40,
           backgroundColor: 'rgba(14,14,28,0.96)',
           borderRadius: 18, borderWidth: 1.5,
           borderColor: current.color + '35',
@@ -250,58 +270,80 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
             ...(Platform.OS === 'web' ? { boxShadow: `0 0 12px ${current.color}` } as any : {}),
           }} />
 
-          {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 10 }}>
-            <View style={{
-              width: 40, height: 40, borderRadius: 12,
-              backgroundColor: current.color + '15', borderWidth: 1, borderColor: current.color + '30',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <MaterialCommunityIcons name={current.icon as any} size={20} color={current.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <NeonText style={{ color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }}>{current.title}</NeonText>
-              <NeonText style={{ color: current.color, fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 1, textTransform: 'uppercase' }}>
-                Passo {step + 1} de {total}
+          {/* Welcome: logo area */}
+          {isWelcome && (
+            <View style={{ alignItems: 'center', paddingTop: 24, paddingBottom: 8 }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: current.color + '15', borderWidth: 2, borderColor: current.color + '40',
+                alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+              }}>
+                <MaterialCommunityIcons name="shield-check" size={32} color={current.color} />
+              </View>
+              <NeonText style={{ color: current.color, fontSize: 9, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase' }}>
+                TUTORIAL RÁPIDO
               </NeonText>
             </View>
-            <Pressable onPress={onComplete} hitSlop={12}
-              style={({ pressed }) => ({
-                width: 28, height: 28, borderRadius: 8,
+          )}
+
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 10, paddingTop: isWelcome ? 4 : 16 }}>
+            {!isWelcome && (
+              <View style={{
+                width: 40, height: 40, borderRadius: 12,
+                backgroundColor: current.color + '15', borderWidth: 1, borderColor: current.color + '30',
                 alignItems: 'center', justifyContent: 'center',
-                backgroundColor: pressed ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
-                ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
-              })}>
-              <MaterialCommunityIcons name="close" size={14} color="#8A8A9A" />
-            </Pressable>
+              }}>
+                <MaterialCommunityIcons name={current.icon as any} size={20} color={current.color} />
+              </View>
+            )}
+            <View style={{ flex: 1, alignItems: isWelcome ? 'center' : 'flex-start' }}>
+              <NeonText style={{ color: '#fff', fontSize: isWelcome ? 18 : 15, fontWeight: '800', letterSpacing: -0.3, textAlign: isWelcome ? 'center' : 'left' }}>{current.title}</NeonText>
+              {!isWelcome && (
+                <NeonText style={{ color: current.color, fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 1, textTransform: 'uppercase' }}>
+                  Passo {step} de {total - 1}
+                </NeonText>
+              )}
+            </View>
+            {!isWelcome && (
+              <Pressable onPress={onComplete} hitSlop={12}
+                style={({ pressed }) => ({
+                  width: 28, height: 28, borderRadius: 8,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: pressed ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
+                  ...(Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}),
+                })}>
+                <MaterialCommunityIcons name="close" size={14} color="#8A8A9A" />
+              </Pressable>
+            )}
           </View>
 
           {/* Body */}
           <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-            <NeonText style={{ color: '#B0B8C8', fontSize: 13, lineHeight: 20 }}>{current.body}</NeonText>
+            <NeonText style={{ color: '#B0B8C8', fontSize: 13, lineHeight: 20, textAlign: isWelcome ? 'center' : 'left' }}>{current.body}</NeonText>
           </View>
 
           {/* Footer: dots + buttons */}
           <View style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            flexDirection: 'row', alignItems: 'center', justifyContent: isWelcome ? 'center' : 'space-between',
             paddingHorizontal: 16, paddingVertical: 12,
             borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
             backgroundColor: 'rgba(255,255,255,0.02)',
           }}>
-            {/* Dots */}
-            <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
-              {steps.map((_, i) => (
-                <View key={i} style={{
-                  width: i === step ? 18 : 6, height: 6, borderRadius: 3,
-                  backgroundColor: i === step ? current.color : 'rgba(255,255,255,0.15)',
-                  ...(Platform.OS === 'web' ? { transition: 'all 0.3s ease' } as any : {}),
-                }} />
-              ))}
-            </View>
+            {!isWelcome && (
+              <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
+                {steps.slice(1).map((_, i) => (
+                  <View key={i} style={{
+                    width: i === step - 1 ? 18 : 6, height: 6, borderRadius: 3,
+                    backgroundColor: i === step - 1 ? current.color : 'rgba(255,255,255,0.15)',
+                    ...(Platform.OS === 'web' ? { transition: 'all 0.3s ease' } as any : {}),
+                  }} />
+                ))}
+              </View>
+            )}
 
-            {/* Buttons */}
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {step > 0 && (
+              {step > 1 && (
                 <Pressable onPress={goBack}
                   style={({ pressed }) => ({
                     paddingVertical: 7, paddingHorizontal: 14, borderRadius: 10,
@@ -310,6 +352,18 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
                     ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
                   })}>
                   <NeonText style={{ color: '#8A8A9A', fontSize: 12, fontWeight: '600' }}>Voltar</NeonText>
+                </Pressable>
+              )}
+              {isWelcome && (
+                <Pressable onPress={onComplete}
+                  style={({ pressed }) => ({
+                    paddingVertical: 7, paddingHorizontal: 14, borderRadius: 10,
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: pressed ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                    marginRight: 4,
+                    ...(Platform.OS === 'web' ? { cursor: 'pointer', transition: 'all 0.2s ease' } as any : {}),
+                  })}>
+                  <NeonText style={{ color: '#8A8A9A', fontSize: 12, fontWeight: '600' }}>Saltar</NeonText>
                 </Pressable>
               )}
               <Pressable onPress={goNext}
@@ -323,7 +377,7 @@ export function TutorialOverlay({ sidebarWidth, isDesktop, onComplete }: Tutoria
                   transform: [{ scale: 1 }],
                 })}>
                 <NeonText style={{ color: '#0D1117', fontSize: 12, fontWeight: '800' }}>
-                  {isLast ? 'Começar!' : 'Próximo →'}
+                  {isWelcome ? 'Começar Tour →' : isLast ? 'Vamos lá!' : 'Próximo →'}
                 </NeonText>
               </Pressable>
             </View>
@@ -345,6 +399,8 @@ function getTipPosition(target: SpotlightTarget, side: string): Record<string, n
       return { top: Math.max(20, target.y + target.h / 2 - 100), left: target.x + target.w + pad };
     case 'left':
       return { top: Math.max(20, target.y + target.h / 2 - 100), right: SW - target.x + pad };
+    case 'center':
+      return { top: SH * 0.3, left: Math.max(20, (SW - 360) / 2) };
     default:
       return { top: target.y + target.h + pad, left: 20 };
   }

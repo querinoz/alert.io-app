@@ -100,7 +100,6 @@ async function testFileIntegrity() {
     'app/settings/index.tsx',
     'app/settings/accessibility.tsx',
     'src/components/ui/SecurityBootScreen.tsx',
-    'src/components/ui/LiveDemoRunner.tsx',
     'src/components/ui/BadgeIcon.tsx',
     'src/components/ui/LoadingRadar.tsx',
     'src/components/ui/LogoMark.tsx',
