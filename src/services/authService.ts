@@ -19,7 +19,6 @@ interface PendingVerification {
   hashedCode: string;
   expiresAt: number;
   displayName: string;
-  password: string;
 }
 
 const VERIFICATION_TTL_MS = 5 * 60 * 1000;
@@ -54,12 +53,11 @@ export async function requestSignUp(
     hashedCode: hashed,
     expiresAt: Date.now() + VERIFICATION_TTL_MS,
     displayName,
-    password,
   });
   return { code };
 }
 
-export async function verifyCode(email: string, code: string): Promise<AuthResult> {
+export async function verifyCode(email: string, code: string, password?: string): Promise<AuthResult> {
   const key = email.toLowerCase();
   const pending = pendingVerifications.get(key);
 
@@ -83,15 +81,19 @@ export async function verifyCode(email: string, code: string): Promise<AuthResul
     if (!isFirebaseConfigured) {
       return { success: true, user: { uid: 'demo-' + Date.now(), email: pending.email, displayName: pending.displayName } as any };
     }
-    const result = await createUserWithEmailAndPassword(auth, pending.email, pending.password);
+    if (!password) {
+      return { success: false, error: 'Password is required to complete registration.' };
+    }
+    const result = await createUserWithEmailAndPassword(auth, pending.email, password);
     await updateProfile(result.user, { displayName: pending.displayName });
     return { success: true, user: result.user };
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const firebaseError = e as { code?: string; message?: string };
     const msg =
-      e.code === 'auth/email-already-in-use' ? 'An account with this email already exists'
-      : e.code === 'auth/weak-password' ? 'Password should be at least 6 characters'
-      : e.code === 'auth/invalid-email' ? 'Invalid email address'
-      : e.message || 'Sign up failed';
+      firebaseError.code === 'auth/email-already-in-use' ? 'An account with this email already exists'
+      : firebaseError.code === 'auth/weak-password' ? 'Password should be at least 6 characters'
+      : firebaseError.code === 'auth/invalid-email' ? 'Invalid email address'
+      : firebaseError.message || 'Sign up failed';
     return { success: false, error: msg };
   }
 }

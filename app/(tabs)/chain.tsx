@@ -194,12 +194,15 @@ export default function ChainScreen() {
               if (!item.location) { announce('Localização indisponível'); return; }
               haptics.light();
               if (activeChain && user) {
-                sendAlert(activeChain.id, user.uid, user.displayName, {
-                  title: `Ping: ${item.name}`,
-                  message: `Pedido de localização para ${item.name}`,
-                  severity: 'info',
-                  type: 'location',
-                });
+                sendAlert(
+                  activeChain.id,
+                  user.uid,
+                  user.displayName,
+                  'location',
+                  `Ping: ${item.name}`,
+                  `Pedido de localização para ${item.name}`,
+                  'info',
+                );
                 announce(`Ping enviado para ${item.name}`);
               }
             }}

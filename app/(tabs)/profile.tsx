@@ -251,6 +251,7 @@ export default function ProfileScreen() {
   const [sosContact, setSosContact] = useState('Contato SOS — configurar');
   const [showSosConfig, setShowSosConfig] = useState(false);
   const [sosInput, setSosInput] = useState('');
+  const [showLevelList, setShowLevelList] = useState(false);
 
   const headerOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const headerSlide = useRef(new Animated.Value(reducedMotion ? 0 : -20)).current;
@@ -300,8 +301,6 @@ export default function ProfileScreen() {
   const badge = getBadgeForReputation(user.reputation);
   const maxWidth = isDesktop ? 640 : undefined;
   const mw = maxWidth ? { maxWidth, width: '100%' as const } : undefined;
-
-  const [showLevelList, setShowLevelList] = useState(false);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
