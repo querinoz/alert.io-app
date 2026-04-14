@@ -79,7 +79,7 @@ export async function verifyCode(email: string, code: string, password?: string)
 
   try {
     if (!isFirebaseConfigured) {
-      return { success: true, user: { uid: 'demo-' + Date.now(), email: pending.email, displayName: pending.displayName } as any };
+      return { success: true, user: { uid: 'user-' + Date.now(), email: pending.email, displayName: pending.displayName } as any };
     }
     if (!password) {
       return { success: false, error: 'Password is required to complete registration.' };
@@ -101,7 +101,10 @@ export async function verifyCode(email: string, code: string, password?: string)
 export async function signInWithEmail(email: string, password: string): Promise<AuthResult> {
   try {
     if (!isFirebaseConfigured) {
-      return { success: true, user: { uid: 'demo-user', email, displayName: 'Demo User' } as any };
+      if (email === 'admin' && password === 'adminadmin') {
+        return { success: true, user: { uid: 'admin-user-001', email: 'admin', displayName: 'Admin' } as any };
+      }
+      return { success: false, error: 'Credenciais inválidas' };
     }
     const result = await signInWithEmailAndPassword(auth, email, password);
     return { success: true, user: result.user };

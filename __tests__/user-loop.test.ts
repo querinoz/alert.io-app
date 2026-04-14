@@ -17,7 +17,12 @@ jest.mock('firebase/auth', () => ({
 }));
 
 jest.mock('../src/services/authService', () => ({
-  signInWithEmail: jest.fn(),
+  signInWithEmail: jest.fn(async (email: string, password: string) => {
+    if (email === 'admin' && password === 'adminadmin') {
+      return { success: true, user: { uid: 'admin-user-001', email: 'admin', displayName: 'Admin' } };
+    }
+    return { success: false, error: 'Credenciais inválidas' };
+  }),
   requestSignUp: jest.fn(),
   verifyCode: jest.fn(),
   signOutUser: jest.fn(async () => {}),
@@ -84,22 +89,22 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
       expect(auth.authError).toBeNull();
     });
 
-    test('1.2 — User signs in with Demo mode', () => {
-      useAuthStore.getState().signInDemo();
+    test('1.2 — User signs in with Demo mode', async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
       const auth = useAuthStore.getState();
 
       expect(auth.user).not.toBeNull();
       expect(auth.isAuthenticated).toBe(true);
       expect(auth.isDemoMode).toBe(true);
-      expect(auth.user!.displayName).toBe('Eduardo Q.');
-      expect(auth.user!.uid).toBe('mock-user-001');
+      expect(auth.user!.displayName).toBe('Admin');
+      expect(auth.user!.uid).toBe('admin-user-001');
       expect(auth.user!.reputation).toBe(203750);
       expect(auth.user!.isGuardian).toBe(true);
       expect(auth.user!.level).toBe(31);
     });
 
-    test('1.3 — User signs out and state resets', () => {
-      useAuthStore.getState().signInDemo();
+    test('1.3 — User signs out and state resets', async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
       useAuthStore.getState().signOut();
@@ -146,8 +151,8 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
       expect(useAuthStore.getState().authError).toBeNull();
     });
 
-    test('1.7 — Profile update works', () => {
-      useAuthStore.getState().signInDemo();
+    test('1.7 — Profile update works', async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
       useAuthStore.getState().updateProfile({ isGhostMode: true, displayName: 'Ghost User' });
 
       const user = useAuthStore.getState().user!;
@@ -167,8 +172,8 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Phase 2: Incidents (Map Screen)', () => {
-    beforeEach(() => {
-      useAuthStore.getState().signInDemo();
+    beforeEach(async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
     });
 
     test('2.1 — Load mock incidents', async () => {
@@ -195,7 +200,7 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
       expect(created.title).toBe('Test incident report');
       expect(created.category).toBe('robbery');
       expect(created.severity).toBe('high');
-      expect(created.reporterName).toBe('Eduardo Q.');
+      expect(created.reporterName).toBe('Admin');
       expect(created.confirmCount).toBe(0);
       expect(created.denyCount).toBe(0);
       expect(created.status).toBe('active');
@@ -246,7 +251,7 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
       expect(updated.commentCount).toBe(beforeComments + 1);
       expect(updated.comments.length).toBeGreaterThan(0);
       expect(updated.comments[updated.comments.length - 1].text).toBe('I saw this too!');
-      expect(updated.comments[updated.comments.length - 1].userName).toBe('Eduardo Q.');
+      expect(updated.comments[updated.comments.length - 1].userName).toBe('Admin');
     });
 
     test('2.7 — Empty comment is ignored', async () => {
@@ -284,11 +289,11 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
       const unverified = useIncidentStore.getState().incidents.find(i => !i.isVerified);
       if (!unverified) return;
 
-      useIncidentStore.getState().verifyIncident(unverified.id, 'guardian-001', 'Eduardo Q.');
+      useIncidentStore.getState().verifyIncident(unverified.id, 'guardian-001', 'Admin');
 
       const updated = useIncidentStore.getState().incidents.find(i => i.id === unverified.id)!;
       expect(updated.isVerified).toBe(true);
-      expect(updated.verifiedByName).toBe('Eduardo Q.');
+      expect(updated.verifiedByName).toBe('Admin');
     });
 
     test('2.11 — Auto-verify at 10 confirms', async () => {
@@ -359,8 +364,8 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Phase 3: Family', () => {
-    beforeEach(() => {
-      useAuthStore.getState().signInDemo();
+    beforeEach(async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
     });
 
     test('3.1 — Load family populates group and members', async () => {
@@ -421,8 +426,8 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Phase 4: Chain System', () => {
-    beforeEach(() => {
-      useAuthStore.getState().signInDemo();
+    beforeEach(async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
       useChainStore.setState({ chains: [], activeChain: null, members: [], messages: [], alerts: [], isLoading: false });
     });
 
@@ -719,8 +724,8 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Phase 8: Profile Screen Functions', () => {
-    beforeEach(() => {
-      useAuthStore.getState().signInDemo();
+    beforeEach(async () => {
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
     });
 
     test('8.1 — Toggle ghost mode on/off', () => {
@@ -767,7 +772,7 @@ describe('🔄 FULL USER LOOP TEST — Acting as a real user', () => {
   describe('Phase 9: Complete User Journey Loop', () => {
     test('FULL LOOP — Sign in → Browse → Report → Interact → Family → Chain → Settings → Sign out', async () => {
       // STEP 1: Sign in
-      useAuthStore.getState().signInDemo();
+      await useAuthStore.getState().signIn('admin', 'adminadmin');
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
       const user = useAuthStore.getState().user!;
 

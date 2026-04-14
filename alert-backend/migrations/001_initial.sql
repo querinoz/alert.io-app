@@ -210,12 +210,12 @@ CREATE TABLE sos_alerts (
 INSERT INTO users (id, email, password_hash, display_name, reputation, level, is_guardian, total_reports, total_confirmations)
 VALUES (
   'a0000000-0000-0000-0000-000000000001',
-  'demo@alert.io',
-  crypt('demo123', gen_salt('bf')),
-  'Demo User',
-  1250,
-  7,
-  FALSE,
-  42,
-  156
+  'admin',
+  crypt('adminadmin', gen_salt('bf')),
+  'Admin',
+  203750,
+  31,
+  TRUE,
+  1842,
+  5670
 );

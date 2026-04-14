@@ -23,7 +23,6 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   requestSignUp: (email: string, password: string, displayName: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
-  signInDemo: () => void;
   signOut: () => void;
   clearError: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
@@ -70,16 +69,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, authError: null });
-    if (!isFirebaseConfigured) {
-      await new Promise((r) => setTimeout(r, 800));
-      set({ user: MOCK_USER, isAuthenticated: true, isLoading: false, isDemoMode: true });
-      return;
-    }
     const result = await signInWithEmail(email, password);
     if (result.success && result.user) {
-      set({ user: firebaseUserToProfile(result.user), isAuthenticated: true, isLoading: false, isDemoMode: false });
+      const profile = isFirebaseConfigured
+        ? firebaseUserToProfile(result.user)
+        : MOCK_USER;
+      set({ user: profile, isAuthenticated: true, isLoading: false, isDemoMode: !isFirebaseConfigured });
     } else {
-      const msg = result.error || 'Sign in failed';
+      const msg = result.error || 'Credenciais inválidas';
       set({ isLoading: false, authError: msg });
       throw new Error(msg);
     }
@@ -148,10 +145,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ isLoading: false, authError: msg });
       throw new Error(msg);
     }
-  },
-
-  signInDemo: () => {
-    set({ user: MOCK_USER, isAuthenticated: true, isLoading: false, isDemoMode: true, authError: null });
   },
 
   signOut: () => {

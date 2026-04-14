@@ -1,13 +1,13 @@
 import type { Incident, UserProfile, FamilyGroup, FamilyMember, FeedItem } from '../types';
 
 export const MOCK_USER: UserProfile = {
-  uid: 'mock-user-001',
-  displayName: 'Eduardo Q.',
-  email: 'eduardo@example.com',
+  uid: 'admin-user-001',
+  displayName: 'Admin',
+  email: 'admin',
   photoURL: null,
   reputation: 203750,
   level: 31,
-  levelName: 'Guardião',
+  levelName: 'Guardião Supremo',
   levelIcon: '🛡️',
   isGuardian: true,
   isProbationary: false,
@@ -166,7 +166,7 @@ export const MOCK_INCIDENTS: Incident[] = [
   },
   {
     id: 'inc-006',
-    reporterUid: 'mock-user-001',
+    reporterUid: 'admin-user-001',
     reporterName: 'Eduardo Q.',
     reporterLevel: 31,
     reporterBadge: 'Guardian',
@@ -196,7 +196,7 @@ export const MOCK_INCIDENTS: Incident[] = [
 export const MOCK_FAMILY: FamilyGroup = {
   groupId: 'family-001',
   name: 'Querino Family',
-  adminUid: 'mock-user-001',
+  adminUid: 'admin-user-001',
   inviteCode: 'ATN3X8KP',
   memberCount: 4,
   maxMembers: 20,
@@ -205,7 +205,7 @@ export const MOCK_FAMILY: FamilyGroup = {
 
 export const MOCK_FAMILY_MEMBERS: FamilyMember[] = [
   {
-    uid: 'mock-user-001',
+    uid: 'admin-user-001',
     displayName: 'Eduardo Q.',
     role: 'admin',
     locationSharingEnabled: true,
@@ -265,15 +265,15 @@ export interface UserProfileCard {
 }
 
 export const MOCK_USER_PROFILES: Record<string, UserProfileCard> = {
-  'mock-user-001': {
-    uid: 'mock-user-001',
-    displayName: 'Eduardo Q.',
+  'admin-user-001': {
+    uid: 'admin-user-001',
+    displayName: 'Admin',
     photoURL: null,
     reputation: 203750,
     level: 31,
-    levelName: 'Guardião',
+    levelName: 'Guardião Supremo',
     levelIcon: '🛡️',
-    badge: 'Guardião',
+    badge: 'Guardião Supremo',
     badgeColor: '#00FFAA',
     isGuardian: true,
     totalReports: 1842,
@@ -281,7 +281,7 @@ export const MOCK_USER_PROFILES: Record<string, UserProfileCard> = {
     verifiedIncidents: 312,
     memberSince: Date.now() - 365 * 86400000,
     lastActive: Date.now(),
-    fame: 'Protetor Lendário',
+    fame: 'Administrador',
     role: 'admin',
     batteryLevel: 85,
     isOnline: true,

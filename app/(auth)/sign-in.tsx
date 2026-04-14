@@ -17,7 +17,7 @@ const QR_URL = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=al
 export default function SignInScreen() {
   const { colors, typography, minTarget, reducedMotion } = useA11y();
   const haptics = useHaptics();
-  const { signIn, signInDemo, isLoading, authError, clearError } = useAuthStore();
+  const { signIn, isLoading, authError, clearError } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -70,13 +70,6 @@ export default function SignInScreen() {
       const currentError = useAuthStore.getState().authError;
       announce('Erro: ' + (currentError || 'Credenciais inválidas'));
     }
-  };
-
-  const handleDemo = () => {
-    haptics.success();
-    signInDemo();
-    announce('Modo demo ativado. Bem-vindo ao Alert.io!');
-    router.replace('/(tabs)');
   };
 
   return (
@@ -170,18 +163,6 @@ export default function SignInScreen() {
             <View style={[styles.dividerLine, { backgroundColor: colors.textTertiary + '20' }]} />
           </View>
 
-          <Pressable
-            onPress={handleDemo}
-            style={({ pressed }) => [
-              styles.demoBtn,
-              { borderColor: Colors.primary + '35', backgroundColor: Colors.primary + (pressed ? '15' : '06') },
-            ]}
-            accessibilityLabel="Experimentar modo demo sem conta"
-            accessibilityRole="button"
-          >
-            <MaterialCommunityIcons name="play-circle-outline" size={18} color={Colors.primary} />
-            <NeonText variant="buttonSm" color={Colors.primary}>Experimentar Modo Demo</NeonText>
-          </Pressable>
         </GlassCard>
         </Animated.View>
 
